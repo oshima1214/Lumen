@@ -4,6 +4,7 @@
   import { orientedSize } from '../../engine/geometry';
   import type { ViewState } from '../../engine/renderer';
   import { useApp } from '../context';
+  import CropOverlay from '../panels/CropOverlay.svelte';
 
   const app = useApp();
   const ed = app.editor;
@@ -71,6 +72,7 @@
 
   /** ダブルクリック: 100% ならクリックした位置を中心に、fit ならそのまま戻す */
   function dbl(e: MouseEvent): void {
+    if (app.tool === 'crop') return;
     if (ed.view.mode === '100') { setMode('fit'); return; }
     const r = app.canvas.getBoundingClientRect();
     const cx = (e.clientX - r.left) / Math.max(1, r.width), cy = (e.clientY - r.top) / Math.max(1, r.height);
@@ -115,6 +117,9 @@
     onpointercancel={up}
     ondblclick={dbl}
   >
+    {#if app.tool === 'crop' && showCanvas}
+      <CropOverlay canvas={app.canvas} />
+    {/if}
     {#if ed.status.decodeError}
       <p class="msg danger">この写真を開けません: {ed.status.decodeError}</p>
     {:else if ed.currentId !== null && ed.working === null}

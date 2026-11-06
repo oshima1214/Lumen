@@ -26,7 +26,7 @@
       // 「設定をコピー」ダイアログと書き出しダイアログは Task 26、切り抜きツールは Task 25 で置き換える
       case 'copy': ed.copy(DEFAULT_COPY_GROUPS); break;
       case 'paste': void ed.paste(ed.selection.length > 0 ? ed.selection : ed.currentId !== null ? [ed.currentId] : []); break;
-      case 'crop': app.tool = app.tool === 'crop' ? 'develop' : 'crop'; break;
+      case 'crop': if (app.tool === 'crop') app.commitCrop(); else app.enterCrop(); break;
       case 'export': app.exportRequested++; break;
       case 'beforeAfter': if (!ed.view.before) ed.setView({ before: true }); break;
     }

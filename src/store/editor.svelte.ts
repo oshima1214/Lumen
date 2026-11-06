@@ -78,6 +78,9 @@ export interface Editor {
   resetAll(): void;
   setRating(n: number): void;
   setView(v: Partial<ViewStateLike>): void;
+  /** 切り抜きツールで編集中の枠（確定前）。プレビューだけに使い、params・保存・履歴には入れない。null で解除 */
+  previewCrop: DevelopParams['crop'] | null;
+  setPreviewCrop(c: DevelopParams['crop'] | null): void;
   copy(groups: ParamGroup[]): void;
   paste(ids: string[]): Promise<{ failed: string[] }>;
   applyPreset(p: Preset, ids?: string[]): Promise<void>;
@@ -155,6 +158,7 @@ class EditorImpl implements Editor {
 
   async open(id: string): Promise<void> {
     const token = ++this.openToken;
+    this.previewCrop = null;
     const prev = this.currentId;
     if (prev !== null && prev !== id) await this.flushId(prev);
     if (token !== this.openToken) return;
@@ -272,8 +276,16 @@ class EditorImpl implements Editor {
     this.canRedo = st.history.canRedo;
   }
 
+  previewCrop = $state.raw<DevelopParams['crop'] | null>(null);
+
+  setPreviewCrop(c: DevelopParams['crop'] | null): void {
+    this.previewCrop = c;
+    this.draw();
+  }
+
   private draw(): void {
-    this.deps.renderer?.render(this.params, this.view);
+    const p = this.previewCrop ? { ...this.params, crop: this.previewCrop } : this.params;
+    this.deps.renderer?.render(p, this.view);
   }
 
   // ---- 編集 ----

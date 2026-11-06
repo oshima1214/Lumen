@@ -1,6 +1,5 @@
 <script lang="ts">
   // 右のパネル（仕様 5.1）: ヒストグラム、基本補正（WB を含む）/ トーンカーブ / HSL / カラーグレーディング / 切り抜き。
-  // トーンカーブと切り抜きは Task 25 で中身を入れる。
   import ChevronDown from 'lucide-svelte/icons/chevron-down';
   import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
   import { useApp } from '../context';
@@ -9,11 +8,16 @@
   import Histogram from '../panels/Histogram.svelte';
   import HslPanel from '../panels/HslPanel.svelte';
   import WbPanel from '../panels/WbPanel.svelte';
+  import CurveEditor from '../panels/CurveEditor.svelte';
+  import CropTool from '../panels/CropTool.svelte';
 
-  const ed = useApp().editor;
+  const app = useApp();
+  const ed = app.editor;
   type Section = 'basic' | 'curve' | 'hsl' | 'grading' | 'crop';
   const SECTIONS: [Section, string][] = [['basic', '基本補正'], ['curve', 'トーンカーブ'], ['hsl', 'HSL'], ['grading', 'カラーグレーディング'], ['crop', '切り抜き']];
   let open = $state<Record<Section, boolean>>({ basic: true, curve: false, hsl: true, grading: true, crop: false });
+  // 切り抜きツールに入ったら切り抜きの欄を開く
+  $effect(() => { if (app.tool === 'crop') open.crop = true; });
 </script>
 
 <div class="right-panel">
@@ -36,8 +40,10 @@
               <HslPanel />
             {:else if key === 'grading'}
               <GradingPanel />
+            {:else if key === 'curve'}
+              <CurveEditor />
             {:else}
-              <p class="sub soon">準備中です</p>
+              <CropTool />
             {/if}
           </div>
         {/if}
@@ -55,5 +61,4 @@
   .chev { display: inline-flex; transition: transform 0.15s; }
   .chev.closed { transform: rotate(-90deg); }
   .body { padding-bottom: 8px; }
-  .soon { padding: 0 12px; margin: 0; }
 </style>

@@ -10,6 +10,10 @@ import { LibraryBackend, requestPersistence } from '../storage/library';
 import type { StorageBackend } from '../storage/types';
 import { createEditor, type Editor } from '../store/editor.svelte';
 import { createBackend, testBackend } from './backend';
+import { aspectValue, constrainCrop, maxInscribedCrop, orientedSize } from '../engine/geometry';
+import type { Aspect, DevelopParams } from '../params/types';
+
+type Crop = DevelopParams['crop'];
 
 function message(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -31,8 +35,10 @@ export class App {
   loading = $state(true);
   /** 左のブラウザで選んだグループ（folder: 相対パス / library: 取り込み日）。null はすべて */
   group = $state<string | null>(null);
-  /** 'crop' は切り抜きツール（R キー。ツール本体は Task 25） */
+  /** 'crop' は切り抜きツール（R キー、Task 25） */
   tool = $state<'develop' | 'crop'>('develop');
+  /** 切り抜きツールで編集中の枠（確定前）。確定で params.crop に入る */
+  cropDraft = $state.raw<Crop | null>(null);
   /** 書き出しの要求回数（Ctrl+Shift+E。ダイアログは Task 26 がこれを見て開く） */
   exportRequested = $state(0);
   /** このセッションで見たレーティング（Editor は現在の画像の分だけを持つ） */
@@ -52,6 +58,68 @@ export class App {
     readonly canvas: HTMLCanvasElement,
     readonly thumbs: ThumbCache,
   ) {}
+
+  // ---- 切り抜きツール（仕様 3.3、計画 Task 25） ----
+  /** 向き補正後のフル解像度の寸法（作業画像が無ければ null） */
+  private orientedFull(): { w: number; h: number } | null {
+    const img = this.editor.working;
+    return img ? orientedSize(img.fullWidth, img.fullHeight, img.orientation) : null;
+  }
+
+  /** プレビューは切り抜く前の画像全体（回転込み）を描き、枠はビューアの上に重ねる */
+  private showDraft(): void {
+    const d = this.cropDraft;
+    this.editor.setPreviewCrop(d ? { x: 0, y: 0, w: 1, h: 1, angle: d.angle, aspect: d.aspect } : null);
+  }
+
+  enterCrop(): void {
+    if (this.editor.currentId === null || !this.editor.working) return;
+    this.cropDraft = { ...this.editor.params.crop };
+    this.tool = 'crop';
+    if (this.editor.view.mode !== 'fit') this.editor.setView({ mode: 'fit' });   // 枠は画面に合わせた表示で扱う
+    this.showDraft();
+  }
+
+  /** 枠を更新する（回転後の画像からはみ出さないよう収める） */
+  setCropDraft(c: Crop): void {
+    const o = this.orientedFull();
+    if (!o) return;
+    this.cropDraft = constrainCrop(c, o.w, o.h);
+    this.showDraft();
+  }
+
+  setCropAspect(a: Aspect): void {
+    const o = this.orientedFull(), d = this.cropDraft;
+    if (!o || !d) return;
+    const r = aspectValue(a, o.w, o.h);
+    if (r === null) { this.cropDraft = { ...d, aspect: a }; return; }
+    this.setCropDraft({ ...d, ...maxInscribedCrop(o.w, o.h, d.angle, r), aspect: a });
+  }
+
+  setCropAngle(angle: number): void {
+    const o = this.orientedFull(), d = this.cropDraft;
+    if (!o || !d) return;
+    const a = Math.min(45, Math.max(-45, angle));
+    const r = aspectValue(d.aspect, o.w, o.h) ?? (d.w * o.w) / (d.h * o.h);
+    // 回転したら、今の縦横比のまま回転後の画像に内接する最大の枠にする（Lightroom と同じ）
+    this.setCropDraft({ ...d, ...maxInscribedCrop(o.w, o.h, a, r), angle: a });
+  }
+
+  resetCrop(): void {
+    this.setCropDraft({ x: 0, y: 0, w: 1, h: 1, angle: 0, aspect: 'original' });
+  }
+
+  commitCrop(): void {
+    const d = this.cropDraft;
+    if (d) this.editor.update((p) => { p.crop = { ...d }; });
+    this.cancelCrop();
+  }
+
+  cancelCrop(): void {
+    this.cropDraft = null;
+    this.tool = 'develop';
+    this.showDraft();
+  }
 
   /** 起動時: 権限を確認し、一覧を読み、先頭の画像を開く */
   async init(): Promise<void> {
@@ -124,7 +192,10 @@ export class App {
     } else {
       ed.selection = [id];
     }
-    if (ed.currentId !== id) await ed.open(id);
+    if (ed.currentId !== id) {
+      if (this.tool === 'crop') this.cancelCrop();   // 切り抜き中に画像を替えたら確定せずに抜ける
+      await ed.open(id);
+    }
   }
 
   /** 左のブラウザでグループを選ぶ。現在の画像が外れたら先頭を開く */

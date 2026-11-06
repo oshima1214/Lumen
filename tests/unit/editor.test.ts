@@ -497,3 +497,39 @@ describe('Renderer に渡す表示状態', () => {
     expect(editor.view.viewport).toEqual({ w: 800, h: 600 });
   });
 });
+
+// ---- 切り抜きツールのプレビュー（Task 25）: 確定前の枠はプレビューだけに使い、params・保存・履歴に入れない ----
+describe('setPreviewCrop', () => {
+  it('上書き中は Renderer に上書きした crop を渡し、params は変えず保存もしない', async () => {
+    const { editor, backend } = setup();
+    const seen: unknown[] = [];
+    const r = { async setImage() {}, render(p: { crop: unknown }) { seen.push(p.crop); } };
+    const { editor: ed2 } = (() => {
+      const deps: EditorDeps = { backend, decoder: stubDecoder(), renderer: r as unknown as RendererPort, platform: { workCap: 4096 },
+        setTimeout: ((fn: () => void, ms?: number) => setTimeout(fn, ms)) as unknown as typeof setTimeout,
+        clearTimeout: ((h: ReturnType<typeof setTimeout>) => clearTimeout(h)) as unknown as typeof clearTimeout };
+      return { editor: createEditor(deps) };
+    })();
+    void editor;
+    await ed2.refresh(); await ed2.open('A');
+    const full = { x: 0, y: 0, w: 1, h: 1, angle: 10, aspect: 'original' as const };
+    ed2.setPreviewCrop(full);
+    expect(seen.at(-1)).toEqual(full);
+    expect(ed2.params.crop.angle).toBe(0);
+    expect(ed2.canUndo).toBe(false);
+    ed2.update((p) => { p.basic.exposure = 1; });
+    expect(seen.at(-1)).toEqual(full);              // 編集しても上書きは保たれる
+    ed2.setPreviewCrop(null);
+    expect((seen.at(-1) as { angle: number }).angle).toBe(0);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(exposureOf(await backend.readSidecar('A'))).toBe(1);
+  });
+
+  it('画像を切り替えると上書きは解除される', async () => {
+    const { editor } = setup();
+    await editor.refresh(); await editor.open('A');
+    editor.setPreviewCrop({ x: 0, y: 0, w: 1, h: 1, angle: 5, aspect: 'free' });
+    await editor.open('B');
+    expect(editor.previewCrop).toBeNull();
+  });
+});
