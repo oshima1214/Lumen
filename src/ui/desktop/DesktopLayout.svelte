@@ -1,10 +1,14 @@
 <script lang="ts">
   // PC 画面の配置（仕様 5.1）: 上にツールバー、左にブラウザ、中央にビューア、右にパネル、下にフィルムストリップ。
   // キーボードショートカット（仕様 5.1）もここで受ける。
+  import ClipboardPaste from 'lucide-svelte/icons/clipboard-paste';
+  import Copy from 'lucide-svelte/icons/copy';
+  import ImageDown from 'lucide-svelte/icons/image-down';
   import Redo2 from 'lucide-svelte/icons/redo-2';
   import Undo2 from 'lucide-svelte/icons/undo-2';
-  import { DEFAULT_COPY_GROUPS } from '../../params/partial';
   import { useApp } from '../context';
+  import CopySettings from '../dialogs/CopySettings.svelte';
+  import ExportDialog from '../dialogs/ExportDialog.svelte';
   import SettingsMenu from '../SettingsMenu.svelte';
   import { isTyping, shortcutAction, type Action } from '../shortcuts';
   import StatusBanner from '../StatusBanner.svelte';
@@ -15,6 +19,18 @@
 
   const app = useApp();
   const ed = app.editor;
+  let copyOpen = $state(false);
+  let exportOpen = $state(false);
+
+  // Ctrl+Shift+E・ツールバー・（Task 27 の iPhone 画面）からの書き出し要求でダイアログを開く
+  let seenExport = app.exportRequested;
+  $effect(() => {
+    const n = app.exportRequested;
+    if (n !== seenExport) {
+      seenExport = n;
+      if (app.targets().length > 0) exportOpen = true;
+    }
+  });
 
   function run(a: Action): void {
     if (typeof a === 'object') { ed.setRating(a.rating); return; }
@@ -23,9 +39,8 @@
       case 'prev': void app.step(-1); break;
       case 'undo': ed.undo(); break;
       case 'redo': ed.redo(); break;
-      // 「設定をコピー」ダイアログと書き出しダイアログは Task 26、切り抜きツールは Task 25 で置き換える
-      case 'copy': ed.copy(DEFAULT_COPY_GROUPS); break;
-      case 'paste': void ed.paste(ed.selection.length > 0 ? ed.selection : ed.currentId !== null ? [ed.currentId] : []); break;
+      case 'copy': if (ed.currentId !== null) copyOpen = true; break;
+      case 'paste': void app.paste(); break;
       case 'crop': app.tool = app.tool === 'crop' ? 'develop' : 'crop'; break;
       case 'export': app.exportRequested++; break;
       case 'beforeAfter': if (!ed.view.before) ed.setView({ before: true }); break;
@@ -34,6 +49,8 @@
 
   function keydown(e: KeyboardEvent): void {
     if (isTyping(e.target)) return;
+    // ダイアログ表示中はショートカットを使わない（Esc などはダイアログが受ける）
+    if (document.querySelector('dialog[open]')) return;
     const a = shortcutAction(e);
     if (a === null) return;
     e.preventDefault();
@@ -60,6 +77,9 @@
     <span class="spacer"></span>
     <span class="sub name">{ed.images.find((r) => r.id === ed.currentId)?.name ?? ''}</span>
     <span class="spacer"></span>
+    <button class="icon" aria-label="設定をコピー" title="設定をコピー（Ctrl+Shift+C）" disabled={ed.currentId === null} onclick={() => (copyOpen = true)}><Copy size={18} /></button>
+    <button class="icon" aria-label="設定をペースト" title="設定をペースト（Ctrl+Shift+V）" disabled={app.copiedGroups === null || ed.currentId === null} onclick={() => app.paste()}><ClipboardPaste size={18} /></button>
+    <button class="icon" aria-label="書き出し" title="書き出し（Ctrl+Shift+E）" disabled={ed.currentId === null} onclick={() => app.exportRequested++}><ImageDown size={18} /></button>
     <SettingsMenu />
   </header>
   <div class="banner"><StatusBanner /></div>
@@ -68,6 +88,9 @@
   <aside class="right" data-testid="right-panel" aria-label="調整パネル"><RightPanel /></aside>
   <footer class="film"><Filmstrip /></footer>
 </div>
+
+{#if copyOpen}<CopySettings onclose={() => (copyOpen = false)} />{/if}
+{#if exportOpen}<ExportDialog onclose={() => (exportOpen = false)} />{/if}
 
 <style>
   .desktop {

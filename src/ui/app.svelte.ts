@@ -9,7 +9,10 @@ import type { Platform } from '../platform/detect';
 import { LibraryBackend, requestPersistence } from '../storage/library';
 import type { StorageBackend } from '../storage/types';
 import { createEditor, type Editor } from '../store/editor.svelte';
-import { createBackend, testBackend } from './backend';
+import { exportImages, type ExportResult, type ExportSettings } from '../export/exporter';
+import type { ParamGroup } from '../params/types';
+import { FolderBackend } from '../storage/folder';
+import { createBackend, pickDirectory, testBackend } from './backend';
 
 function message(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -33,8 +36,10 @@ export class App {
   group = $state<string | null>(null);
   /** 'crop' は切り抜きツール（R キー。ツール本体は Task 25） */
   tool = $state<'develop' | 'crop'>('develop');
-  /** 書き出しの要求回数（Ctrl+Shift+E。ダイアログは Task 26 がこれを見て開く） */
+  /** 書き出しの要求回数（Ctrl+Shift+E・ツールバー。書き出しダイアログはこれを見て開く） */
   exportRequested = $state(0);
+  /** 「設定をコピー」で最後にコピーしたグループ（未コピーは null。ペーストの可否に使う） */
+  copiedGroups = $state<ParamGroup[] | null>(null);
   /** このセッションで見たレーティング（Editor は現在の画像の分だけを持つ） */
   readonly ratings = new SvelteMap<string, number>();
   /** フィルムストリップに出す画像（グループで絞り込み） */
@@ -132,6 +137,68 @@ export class App {
     this.group = g;
     const ed = this.editor;
     if (!this.visible.some((r) => r.id === ed.currentId) && this.visible[0]) await this.select(this.visible[0].id);
+  }
+
+  /** 設定のペースト・プリセットの適用・書き出しの対象（フィルムストリップの選択。無ければ現在の画像） */
+  targets(): string[] {
+    const ed = this.editor;
+    return ed.selection.length > 0 ? [...ed.selection] : ed.currentId !== null ? [ed.currentId] : [];
+  }
+
+  /** 「設定をコピー」（仕様 4.4）: 現在の画像の指定グループをコピーする */
+  copy(groups: ParamGroup[]): void {
+    if (this.editor.currentId === null || groups.length === 0) return;
+    this.editor.copy(groups);
+    this.copiedGroups = [...groups];
+  }
+
+  /** 選択中の全件にペーストし、各サイドカーに保存する（仕様 4.4）。失敗した写真は画面上部に出す */
+  async paste(): Promise<void> {
+    if (this.copiedGroups === null) return;
+    const { failed } = await this.editor.paste(this.targets());
+    if (failed.length > 0) this.error = `設定を貼り付けられなかった写真: ${failed.map((id) => this.nameOf(id)).join('、')}`;
+  }
+
+  nameOf(id: string): string {
+    return this.editor.images.find((r) => r.id === id)?.name ?? id;
+  }
+
+  /** フォルダ方式の書き出し先・プリセットフォルダの名前（未指定・ライブラリ方式は null） */
+  async dirName(purpose: 'export' | 'presets'): Promise<string | null> {
+    return this.backend instanceof FolderBackend ? this.backend.dirName(purpose) : null;
+  }
+
+  /** フォルダ方式で書き出し先・プリセットフォルダを選ぶ（クリックの中から呼ぶ）。キャンセルは null */
+  async chooseDir(purpose: 'export' | 'presets'): Promise<string | null> {
+    const b = this.backend;
+    if (!(b instanceof FolderBackend)) return null;
+    let dir: FileSystemDirectoryHandle;
+    try {
+      dir = await pickDirectory(purpose);
+    } catch (e) {
+      if (isAbort(e)) return null;
+      throw e;
+    }
+    if (purpose === 'export') await b.setExportDir(dir);
+    else await b.setPresetDir(dir);
+    return dir.name;
+  }
+
+  /**
+   * 一括書き出し（仕様 6）。保留中の編集を先にサイドカーへ書き、書き出し専用の Decoder / Renderer で 1 枚ずつ処理する
+   * （プレビュー用のインスタンスを使うと編集中の画像が追い出されるため。Task 21 の判断）。
+   */
+  async exportImages(ids: string[], s: ExportSettings, onProgress: (done: number, total: number) => void, signal: AbortSignal): Promise<ExportResult> {
+    await this.editor.flush();
+    const decoder = new Decoder();
+    let renderer: Renderer | null = null;
+    try {
+      renderer = new Renderer(this.renderer.currentGpu, new OffscreenCanvas(1, 1), { previewCap: 2048 });
+      return await exportImages(ids, s, { backend: this.backend, decoder, renderer, workCap: this.platform.workCap }, onProgress, signal);
+    } finally {
+      renderer?.destroy();
+      decoder.terminate();
+    }
   }
 
   /** 画像送り（delta = +1 で次、-1 で前） */

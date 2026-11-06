@@ -39,7 +39,13 @@ export class Decoder {
   }
   /** 元データ（フル解像度、向き補正前の座標）から RGB を切り出す。範囲外は端の画素で埋める */
   readTile(handle: string, rect: Rect): Promise<Uint16Array> { return this.call({ type: 'readTile', handle, rect }); }
-  close(handle: string): void { void this.call({ type: 'close', handle }); }
+  close(handle: string): void { this.call({ type: 'close', handle }).catch(() => {}); }
+  /** Worker を止める（書き出し専用のインスタンスを使い終えたとき）。以後の呼び出しは応答しない */
+  terminate(): void {
+    this.worker.terminate();
+    for (const p of this.pending.values()) p.ng(new Error('デコーダーを終了しました'));
+    this.pending.clear();
+  }
   /** RAW は埋め込み JPEG、他は縮小 JPEG */
   preview(file: Blob, name: string, maxEdge: number): Promise<Blob> { return this.call({ type: 'preview', file, name, maxEdge }); }
 }

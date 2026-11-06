@@ -1,9 +1,10 @@
 <script lang="ts">
   // 左のブラウザ（仕様 5.1）: フォルダ方式はフォルダツリー、ライブラリ方式は取り込み日の一覧。
-  // フォルダの権限が失効していれば「アクセスを再許可」を出す（仕様 7）。プリセット一覧は Task 26。
+  // フォルダの権限が失効していれば「アクセスを再許可」を出す（仕様 7）。その下にプリセット一覧。
   import FolderOpen from 'lucide-svelte/icons/folder-open';
   import ImagePlus from 'lucide-svelte/icons/image-plus';
   import { useApp } from '../context';
+  import PresetList from '../dialogs/PresetList.svelte';
 
   const app = useApp();
   const folder = app.backend.kind === 'folder';
@@ -53,6 +54,7 @@
       {/each}
     </ul>
   {/if}
+  {#if !app.needsPermission}<PresetList />{/if}
 </nav>
 
 <style>

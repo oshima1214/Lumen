@@ -52,3 +52,28 @@ export async function createBackend(kind: 'folder' | 'library'): Promise<Storage
     now: () => new Date(),
   });
 }
+
+/**
+ * 書き出し先・プリセットのフォルダを選ぶ（フォルダ方式のみ。クリックの中から呼ぶ）。
+ * テストモードのビルドだけは window.__lumenTestPickDirectory を使う（本番ビルドでは静的に消える）。
+ */
+export function pickDirectory(purpose: 'export' | 'presets'): Promise<FileSystemDirectoryHandle> {
+  if (import.meta.env.MODE === 'test') {
+    const t = (window as unknown as { __lumenTestPickDirectory?(p: string): Promise<FileSystemDirectoryHandle> }).__lumenTestPickDirectory;
+    if (t) return t(purpose);
+  }
+  const w = window as unknown as { showDirectoryPicker(o: { mode: 'readwrite'; id?: string }): Promise<FileSystemDirectoryHandle> };
+  return w.showDirectoryPicker({ mode: 'readwrite', id: `lumen-${purpose}` });
+}
+
+/** ファイルをダウンロードとして保存する（プリセットの JSON 書き出し） */
+export function downloadFile(name: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
