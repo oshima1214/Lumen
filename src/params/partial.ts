@@ -1,5 +1,6 @@
 // 深い差分と深いマージ（仕様 4.1 / 4.3）。配列は値として扱い、要素ごとにはマージしない。
-import type { DeepPartial } from './types';
+import { clampParams } from './defaults';
+import type { DeepPartial, DevelopParams, ParamGroup } from './types';
 
 export type { DeepPartial } from './types';
 
@@ -60,3 +61,43 @@ function mergeUnknown(base: unknown, partial: unknown): unknown {
   if (partial === undefined || typeof partial !== typeof base) return base;
   return partial;
 }
+
+/**
+ * partial のうち base と同じ形の項目だけを残す（未知のキーと型違いを落とす）。
+ * deepDiff と違い、base と等しい値も残す（プリセットが明示的に 0 に戻す項目を失わないため）。
+ */
+export function pruneToShape<T>(base: T, partial: unknown): DeepPartial<T> {
+  return (pruneUnknown(base, partial) ?? {}) as DeepPartial<T>;
+}
+
+function pruneUnknown(base: unknown, partial: unknown): unknown {
+  if (isPlainObject(base)) {
+    if (!isPlainObject(partial)) return undefined;
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(partial)) {
+      if (!(k in base)) continue;
+      const v = pruneUnknown(base[k], partial[k]);
+      if (v !== undefined) out[k] = v;
+    }
+    return out;
+  }
+  if (Array.isArray(base)) return Array.isArray(partial) ? clone(partial) : undefined;
+  return typeof partial === typeof base ? partial : undefined;
+}
+
+// ---- DevelopParams 向け（仕様 4.3 / 4.4） ----
+
+/** 含まれる項目だけを上書きし、範囲に丸める */
+export function applyPartial(base: DevelopParams, partial: DeepPartial<DevelopParams>): DevelopParams {
+  return clampParams(deepMerge<DevelopParams>(base, partial));
+}
+
+/** 指定グループの値を丸ごと（既定値と等しい項目も含めて）取り出す。貼り付け先を元と同じ値にするため */
+export function pickGroups(p: DevelopParams, groups: ParamGroup[]): DeepPartial<DevelopParams> {
+  const out: Record<string, unknown> = {};
+  for (const g of groups) out[g] = clone(p[g]);
+  return out as DeepPartial<DevelopParams>;
+}
+
+/** 「設定をコピー」の既定（WB と切り抜きは既定でオフ） */
+export const DEFAULT_COPY_GROUPS: ParamGroup[] = ['basic', 'curve', 'hsl', 'grading'];
