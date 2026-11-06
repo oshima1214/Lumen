@@ -104,10 +104,19 @@ export function parsePreset(v: unknown): Preset | null {
   return { name: o['name'], builtin: false, params: params as Preset['params'] };
 }
 
-/** プリセット名からファイル名を作る（使えない文字は '_'） */
+/** プリセット名からファイル名を作る（使えない文字は '_'）。フォルダ方式用で日本語はそのまま残す */
 export function presetFileStem(name: string): string {
   // eslint-disable-next-line no-control-regex
   const s = name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').replace(/^[.\s]+/, '').trim().slice(0, 100);
+  return s === '' ? 'preset' : s;
+}
+
+/**
+ * OPFS 用: ASCII だけのファイル名。Chromium の OPFS は環境によって非 ASCII の名前を
+ * TypeMismatchError で拒否するため（同一性は中身の name で判定するので名前は読めなくてよい）。
+ */
+export function asciiPresetFileStem(name: string): string {
+  const s = presetFileStem(name).replace(/[^A-Za-z0-9 _.-]/g, '').replace(/^[.\s]+/, '').trim();
   return s === '' ? 'preset' : s;
 }
 
@@ -119,6 +128,7 @@ export class DirectoryPresetStore implements PresetStore {
   constructor(
     private readonly getDir: (create: boolean) => Promise<FileSystemDirectoryHandle | null>,
     private readonly write: WriteFile,
+    private readonly fileStem: (name: string) => string = presetFileStem,
   ) {}
 
   private async scan(dir: FileSystemDirectoryHandle): Promise<{ file: string; preset: Preset }[]> {
@@ -151,7 +161,7 @@ export class DirectoryPresetStore implements PresetStore {
     let file = existing[0]?.file;
     if (!file) {
       const taken = await namesIn(dir);
-      file = uniqueName(`${presetFileStem(p.name)}.json`, (n) => taken.has(n));
+      file = uniqueName(`${this.fileStem(p.name)}.json`, (n) => taken.has(n));
     }
     await this.write(dir, file, body);
     for (const extra of existing.slice(1)) await removeIfExists(dir, extra.file);
