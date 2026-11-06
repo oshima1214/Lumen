@@ -9,6 +9,7 @@
 // - 保存失敗: status.saveError を立て、内容はメモリに保持。5 秒後か、次の変更（デバウンス後）に再試行。
 // - readOnly（新しすぎる schema、またはサイドカーを読めなかった）の画像は保存しない。
 // - Renderer は Task 15 の実装に依存しないよう、必要な形だけを RendererPort として定義する。
+import type { ViewState } from '../engine/renderer';
 import { DecodeError, type Decoder } from '../decode/client';
 import type { WorkingImage } from '../decode/types';
 import { GpuOutOfMemoryError } from '../engine/errors';
@@ -26,11 +27,8 @@ export const SAVE_RETRY_MS = 5000;
 export const MIN_WORK_CAP = 512;
 export const LOW_RES_NOTICE = '解像度を下げて表示しています';
 
-/** Task 15 の ViewState と同じ形（Renderer が受け取る表示状態） */
-export interface ViewStateLike {
-  mode: 'fit' | '100'; cx: number; cy: number; before: boolean;
-  background: 'black' | 'dark' | 'gray18';
-}
+/** Renderer が受け取る表示状態（Task 15 の ViewState そのもの。viewport はビューアが setView で設定する） */
+export type ViewStateLike = ViewState;
 
 /** Editor が使う Renderer の範囲（Task 15 の Renderer が満たす） */
 export interface RendererPort {
@@ -120,7 +118,7 @@ class EditorImpl implements Editor {
   rating = $state(0);
   readOnly = $state(false);
   status = $state<EditorStatus>({ saveError: null, sourceChanged: false, corrupted: false, decodeError: null, notice: null });
-  view = $state.raw<ViewStateLike>({ mode: 'fit', cx: 0.5, cy: 0.5, before: false, background: 'dark' });
+  view = $state.raw<ViewStateLike>({ mode: 'fit', cx: 0.5, cy: 0.5, before: false, background: 'dark', viewport: { w: 1, h: 1 } });
   handle = $state<string | null>(null);
   working = $state.raw<WorkingImage | null>(null);
   canUndo = $state(false);

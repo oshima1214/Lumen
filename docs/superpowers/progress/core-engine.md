@@ -121,3 +121,22 @@ Task 15: Ruling: headless SwiftShader loses the device on WebGPU canvas getCurre
 Task 15: Ruling: develop.wgsl dither skipped for pixels at 0 or 1 (clipped) so histogram clip counts are exact — found by histogram test (RED 1022/1024 → GREEN) — cost: none
 Task 15: Ruling: renderTileFull is NOT added here; Task 20 adds it with its own tests — cost: none
 Task 15: complete (commits 77ad82c..46b8583, tests: sh -c 'npx tsc -p . && npx vitest run && npx playwright test --trace off' →   37 passed (29.6s))
+Task 18: complete (track S, commit 7bcd9ad, tests: vitest thumbs 9/9, e2e thumbs.spec 3/3)
+Task 19: complete (track S, commit 7b07c8c, tests: vitest history 8 + editor 25; branch total vitest 235, e2e 29)
+Merge track S: tsc clean, vitest 246, e2e 40 pass 1 skip
+Task 18: Ruling: ThumbCache optional 4th arg store {get,set,del}; default idbThumbStore (DB lumen-thumbs); memoryThumbStore for tests — cost: none
+Task 18: Ruling: one record per image keyed `${kind}:${id}` holding {key: thumbKey(ref), blob}; mismatch → rebuild/overwrite; invalidate deletes — cost: none
+Task 18: Ruling: concurrency 2 covers readOriginal+preview; duplicate in-flight refs share a job; IndexedDB errors ignored (thumb still returned) — cost: rebuilds when IDB unavailable
+Task 18: Ruling: e2e thumbs.spec written after implementation (test-after); unit tests were fail-first — cost: weaker proof for idb path
+Task 19: Ruling: RendererPort {setImage(): Promise<void>; render()}; GpuOutOfMemoryError → close handle, halve workCap down to MIN_WORK_CAP 512, notice '解像度を下げて表示しています', then decodeError — cost: none
+Task 19: Ruling: all logic in editor.svelte.ts with $state.raw for params/images/view/working (structuredClone-safe) — cost: none
+Task 19: Ruling: EditorDeps narrowed (decoder Pick open|close, platform Pick workCap) — cost: none
+Task 19: Ruling: Editor adds view/setView, handle, working, canUndo/canRedo — cost: none
+Task 19: Ruling: per-image History/state kept in memory for the session; reopening doesn't reread sidecar — cost: external sidecar edits mid-session unseen
+Task 19: Ruling: saves serialized per image; edits during write trigger a follow-up write; open(B) awaits A's pending/running save, errors don't block switch — cost: none
+Task 19: Ruling: failed save retries after 5 s or next debounced edit; saveError shows first failing image — cost: none
+Task 19: Ruling: non-corrupt sidecar read error → defaults, read-only, notice; quarantine failure → read-only (never overwrite unread sidecar) — cost: no saving until fixed
+Task 19: Ruling: update runs clampParams; readOnly allows edits but no save; rating saved but not in Undo; resetAll resets all groups incl. crop/WB (undoable) — cost: one line if crop should survive reset
+Task 19: Ruling: paste/applyPreset use per-image state (enter Undo); read-only/failed writes reported in `failed`; applyPreset without ids = current image — cost: none
+Task 19: Ruling: concurrent open() — only latest applies; stale handles closed — cost: none
+Merge fix: Ruling: editor ViewStateLike lacked Renderer's required `viewport` → would crash Renderer.draw at runtime (tsc missed it via method bivariance); ViewStateLike = ViewState, default viewport {1,1}; test 'Renderer に渡す表示状態' RED→GREEN — cost: none

@@ -486,3 +486,14 @@ describe('コピー＆ペースト', () => {
     expect(fromSidecar(backend.sidecars.get('C')).params.basic.contrast).toBe(30);
   });
 });
+
+// ---- Renderer との結合（Task 15 の ViewState には viewport が必須） ----
+describe('Renderer に渡す表示状態', () => {
+  it('既定の view は viewport を持ち、setView で更新できる', () => {
+    const { editor } = setup();
+    expect(editor.view.viewport.w).toBeGreaterThan(0);
+    expect(editor.view.viewport.h).toBeGreaterThan(0);
+    editor.setView({ viewport: { w: 800, h: 600 } });
+    expect(editor.view.viewport).toEqual({ w: 800, h: 600 });
+  });
+});
