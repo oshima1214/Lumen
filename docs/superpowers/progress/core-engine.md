@@ -77,3 +77,9 @@ Task 9: Ruling: added src/decode/encoded.ts (rgba8ToLinear2020) shared by displa
 Task 9: Ruling: libheif-js loaded lazily via dynamic import of libheif-bundle.mjs (2 MB) so it stays out of the main bundle; HEIC P3 assumed when ICC says P3 or Make==Apple; libheif output orientation 1 (irot applied) — cost: non-Apple sRGB HEIC with P3-less ICC still correct
 Task 9: Ruling: synthetic HEIC fixture (pillow-heif) + libheif-path e2e added beyond plan; written after the implementation existed (passed first run) — test-after for that one case — cost: weaker proof for HEIC path
 Task 9: complete (commits 3f6d544..c9616e9, tests: sh -c 'npx tsc -p . && npx vitest run && npx playwright test --trace off' →   10 passed (5.6s))
+Task 10: Ruling: adopted npm libraw-wasm@1.6.0 (ISC; meets a–f) instead of self-building; color_data only with metadata(true) — see docs/decisions/libraw-wasm.md — cost: self-build later if new cameras/JXL needed
+Task 10: Ruling: LibRaw outputs slightly larger than nominal (20D 3522-ish vs 3504); dimension tolerance widened ±8 → ±40 — cost: none
+Task 10: Ruling: camToXyz fallback chain cam_xyz → DNG ColorMatrix (D65-nearest illuminant) → SRGB_TO_XYZ·rgb_cam; neutral from DNG AsShotNeutral → cam_mul → pre_mul; added as-shot CCT 2500–10000K sanity check to every RAW test (catches matrix orientation errors) — cost: none
+Task 10: Ruling: bayer DNG without embedded JPEG → extractRawPreview returns null (Task 11 preview falls back to downscaled decode) — cost: none
+Task 10: Ruling: JPEG XL compressed DNG unsupported by bundled LibRaw (placeholder only); added Task 10b to the plan, deferred until a sample exists — cost: iPhone 16 Pro+ JXL ProRAW cannot be opened in v1 (clear error)
+Task 10: complete (commits 05229c2..27b332b, tests: sh -c 'npx tsc -p . && npx vitest run && npx playwright test --trace off' →   15 passed (18.7s))
