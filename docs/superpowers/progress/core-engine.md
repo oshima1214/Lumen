@@ -178,3 +178,9 @@ Task 24: Ruling: grading via per-region H/S/L sliders + swatch, no colour wheels
 Task 24: Ruling: histogram refresh 120 ms after change + 2 rAF; end bins ignored for scale; clip boxes with % tooltip — cost: ~150 ms lag
 Task 24: Ruling: right panel 「すべてリセット」; tone curve/crop sections show 「準備中です」 until Task 25 — cost: none
 Tests: Ruling: harness.ts exports routeFiles() (refactor) — cost: none
+Task 25: Ruling: crop tool works on app.cropDraft (not params) and shows the WHOLE frame (crop 0,0,1,1 at the draft angle) via new Editor.setPreviewCrop (preview-only override, not saved/undone, cleared on open) — Lightroom-like context around the frame; Enter commits as one undo step, Esc cancels, switching image cancels — cost: rotated-corner areas outside the image show edge-clamped pixels under the dark mask
+Task 25: Ruling: changing angle refits the largest inscribed frame at the current aspect (Lightroom behaviour); changing aspect refits maxInscribedCrop; handle drags keep the aspect and are constrained by constrainCrop; entering crop forces fit view — cost: none
+Task 25: Ruling: angle control = range + number input (spinbutton '角度'); aspect buttons 元画像/自由/1:1/4:5/3:2/16:9; crop section opens automatically in crop mode — cost: none
+Task 25: Ruling: curve editor: RGB/R/G/B tabs (role tab), click adds point, drag moves (one gesture), dblclick removes, parametric 4 sliders + 3 split sliders (min gap 0.05) — cost: none
+Task 25: Ruling: e2e test fixes (scrollIntoView before clicking the curve; exact tab name) were test-side issues — cost: none
+Task 25: complete (commits 142cd59..53bfe8a, tests: sh -c 'npx tsc -p . && npx svelte-check --tsconfig ./tsconfig.json --threshold error && npx vitest run && npx playwright test --trace off' →   75 passed (1.2m))
