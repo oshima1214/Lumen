@@ -63,6 +63,12 @@ export class FolderBackend implements StorageBackend {
   setExportDir(dir: FileSystemDirectoryHandle): Promise<void> { return this.setSlot('export', dir); }
   setPresetDir(dir: FileSystemDirectoryHandle): Promise<void> { return this.setSlot('presets', dir); }
 
+  /** 書き出し先・プリセットのフォルダ名（未指定は null）。UI の表示用 */
+  async dirName(slot: 'export' | 'presets'): Promise<string | null> {
+    await this.load();
+    return this.handles[slot]?.name ?? null;
+  }
+
   private async present(): Promise<FileSystemDirectoryHandle[]> {
     await this.load();
     return Object.values(this.handles).filter((h): h is FileSystemDirectoryHandle => h !== null);

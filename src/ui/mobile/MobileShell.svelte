@@ -15,7 +15,7 @@
   }
 </script>
 
-<div class="mobile">
+<div class="mobile" data-testid="mobile-shell">
   {#if screen === 'grid'}
     <header class="top">
       <span class="logo">Lumen</span>

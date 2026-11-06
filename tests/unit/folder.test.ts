@@ -202,3 +202,18 @@ describe('FolderBackend の細部', () => {
     expect(backend.kind).toBe('folder');
   });
 });
+
+describe('FolderBackend の書き出し先・プリセットフォルダ名（Task 26 の UI 表示用）', () => {
+  test('未指定は null、指定後はフォルダ名。保存したハンドルから復元される', async () => {
+    const handleStore = memoryHandleStore();
+    const root = fakeDir('photos');
+    const b = new FolderBackend({ pickDirectory: async () => root.asHandle(), handleStore });
+    expect(await b.dirName('export')).toBeNull();
+    expect(await b.dirName('presets')).toBeNull();
+    await b.setExportDir(fakeDir('書き出し').asHandle());
+    expect(await b.dirName('export')).toBe('書き出し');
+    const again = new FolderBackend({ pickDirectory: async () => root.asHandle(), handleStore });
+    expect(await again.dirName('export')).toBe('書き出し');
+    expect(await again.dirName('presets')).toBeNull();
+  });
+});

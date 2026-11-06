@@ -257,6 +257,9 @@ export class Renderer {
     return { w: out.width, h: out.height, data };
   }
 
+  /** いま使っている GPU（デバイス喪失後は作り直したもの）。書き出し専用の Renderer を同じデバイスで作るため */
+  get currentGpu(): Gpu { return this.gpu; }
+
   destroy(): void {
     if (this.raf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this.raf);
     this.gimg?.destroy(); this.out?.destroy(); this.dummyBase.destroy();

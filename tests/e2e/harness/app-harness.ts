@@ -1,6 +1,7 @@
 // テストモードのアプリ入口（本番バンドル外）。偽のフォルダを FolderBackend で包み、window.__lumenTestBackend に置く。
 // クエリ: set=basic|broken、perm=granted|prompt（prompt は再起動後の権限失効の模擬）、
 // backend=library（実 OPFS の LibraryBackend。共有シートは window.__shared に記録するスタブ）。
+// フォルダ選択は window.__lumenTestPickDirectory が偽のフォルダ（書き出し・プリセット）を返す（Task 26）。
 import { FakeDir } from '../../helpers/fake-fs';
 import { FolderBackend } from '../../../src/storage/folder';
 import { LibraryBackend } from '../../../src/storage/library';
@@ -57,9 +58,17 @@ async function start(): Promise<void> {
     pickDirectory: async () => root as unknown as FileSystemDirectoryHandle,
     handleStore: { get: async (k) => handles.get(k), set: async (k, h) => { handles.set(k, h); } },
   });
-  const w = window as unknown as { __lumenTestBackend: unknown; __lumenTestRoot: unknown };
+  // 書き出し先・プリセットのフォルダ選択（showDirectoryPicker の代わり）。選んだフォルダは __lumenTestDirs で見られる
+  const dirs: Record<string, FakeDir> = {};
+  const w = window as unknown as {
+    __lumenTestBackend: unknown; __lumenTestRoot: unknown; __lumenTestDirs: unknown;
+    __lumenTestPickDirectory(purpose: 'export' | 'presets'): Promise<FileSystemDirectoryHandle>;
+  };
   w.__lumenTestBackend = backend;
   w.__lumenTestRoot = root;
+  w.__lumenTestDirs = dirs;
+  w.__lumenTestPickDirectory = async (purpose) =>
+    (dirs[purpose] ??= new FakeDir(purpose === 'export' ? '書き出し' : 'プリセット')) as unknown as FileSystemDirectoryHandle;
   await import('../../../src/main');
 }
 void start();

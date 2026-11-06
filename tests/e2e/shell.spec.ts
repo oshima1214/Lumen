@@ -18,10 +18,11 @@ test('1280×800 では右パネルが見える', async ({ page }) => {
   await expect(page.getByTestId('tool-tabs')).toHaveCount(0);
 });
 
-test('390×844 では下部のツールタブが見える', async ({ page }) => {
+// iPhone 画面は一覧から始まり、ツールのタブは編集画面に出る（Task 27。tests/e2e/mobile.spec.ts で確認）
+test('390×844 では iPhone 画面になる', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
-  await expect(page.getByTestId('tool-tabs')).toBeVisible();
+  await expect(page.getByTestId('mobile-shell')).toBeVisible();
   await expect(page.getByTestId('right-panel')).toHaveCount(0);
 });
 
@@ -30,7 +31,7 @@ test('幅を変えるとレイアウトが切り替わる（1024px 境界）', a
   await page.goto('/');
   await expect(page.getByTestId('right-panel')).toBeVisible();
   await page.setViewportSize({ width: 1023, height: 800 });
-  await expect(page.getByTestId('tool-tabs')).toBeVisible();
+  await expect(page.getByTestId('mobile-shell')).toBeVisible();
   await expect(page.getByTestId('right-panel')).toHaveCount(0);
 });
 
