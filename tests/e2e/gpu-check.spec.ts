@@ -14,5 +14,6 @@ test('/gpu-check/ が全項目を計測して完了する', async ({ page }) => 
   expect(report.alloc4096x3072).toMatch(/確保 OK/);
   expect(report).toHaveProperty('alloc8064x6048');
   expect(report.developMs).toMatch(/^[\d.]+ ms/);
-  await expect(page.locator('#results tr')).toHaveCount(8);
+  expect(report.baseLayerMs).toMatch(/^[\d.]+ ms/);
+  await expect(page.locator('#results tr')).toHaveCount(9);
 });

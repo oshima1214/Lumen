@@ -1,10 +1,11 @@
 // iPhone 実機検証ページ（計画 Task 13 Step 5）。アプリ本体とは独立した入口（dist/gpu-check/index.html）。
 // 表示する項目: アダプタ情報、rgba16float のストレージ書き込み可否、maxTextureDimension2D、maxBufferSize、
-// 合成 2048×2048 の作業画像の現像時間（20 回平均）、4096×3072 と 8064×6048 の rgba16float テクスチャ確保の成否。
+// 合成 2048×2048 の作業画像の現像時間（20 回平均。ベース層の作成時間も別に表示）、4096×3072 と 8064×6048 の rgba16float テクスチャ確保の成否。
 import { buildUniforms, packUniforms } from '../color/uniforms';
 import { defaultParams } from '../params/defaults';
 import { deepMerge } from '../params/partial';
-import { DevelopPass, lumTexture } from '../engine/develop';
+import { DevelopPass } from '../engine/develop';
+import { LocalTonePass } from '../engine/localtone';
 import { identitySample } from '../engine/geometry';
 import { createGpu, type Gpu } from '../engine/gpu';
 import { mipCountFor, uploadRgb16 } from '../engine/upload';
@@ -106,7 +107,7 @@ async function checkAlloc(gpu: Gpu, w: number, h: number): Promise<{ ok: boolean
 }
 
 /** 合成 N×N の作業画像を全処理段ありで現像する時間（20 回平均） */
-async function benchDevelop(gpu: Gpu, N: number): Promise<{ avgMs: number; firstMs: number }> {
+async function benchDevelop(gpu: Gpu, N: number): Promise<{ avgMs: number; firstMs: number; baseMs: number }> {
   const { device } = gpu;
   const data = new Uint16Array(N * N * 3);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
@@ -116,7 +117,6 @@ async function benchDevelop(gpu: Gpu, N: number): Promise<{ avgMs: number; first
     data[i + 2] = ((x + y) * 16) & 0xffff;
   }
   const img = uploadRgb16(gpu, data, N, N);
-  const base = lumTexture(gpu, new Float32Array(512 * 512).fill(0.18), 512, 512);
   const out = device.createTexture({ size: { width: N, height: N }, format: 'rgba8unorm', usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC });
   const p = deepMerge(defaultParams(), {
     basic: { exposure: 0.5, contrast: 30, highlights: -40, shadows: 30, whites: 10, blacks: -10, vibrance: 20, saturation: 10 },
@@ -128,6 +128,17 @@ async function benchDevelop(gpu: Gpu, N: number): Promise<{ avgMs: number; first
   const packed = packUniforms(u);
   const pass = new DevelopPass(gpu);
   pass.setLuts(luts);
+  // ベース層（処理段 4。WB・露光を変えたときだけ作り直す）
+  const local = new LocalTonePass(gpu);
+  let base = local.build(img, packed);
+  await device.queue.onSubmittedWorkDone();
+  let baseTotal = 0;
+  for (let i = 0; i < 20; i++) {
+    const t0 = performance.now();
+    base = local.build(img, packed);
+    await device.queue.onSubmittedWorkDone();
+    baseTotal += performance.now() - t0;
+  }
   const once = async () => {
     const t0 = performance.now();
     pass.run(img.texture, 0, base, packed, out, { x: 0, y: 0, w: N, h: N }, identitySample(N, N));
@@ -138,10 +149,10 @@ async function benchDevelop(gpu: Gpu, N: number): Promise<{ avgMs: number; first
   let total = 0;
   for (let i = 0; i < 20; i++) total += await once();
   pass.destroy();
+  local.destroy();
   img.destroy();
-  base.destroy();
   out.destroy();
-  return { avgMs: total / 20, firstMs };
+  return { avgMs: total / 20, firstMs, baseMs: baseTotal / 20 };
 }
 
 async function main(): Promise<void> {
@@ -172,6 +183,7 @@ async function main(): Promise<void> {
   try {
     const b = await benchDevelop(gpu, N);
     add('developMs', `現像 ${N}×${N}（20 回平均）`, `${b.avgMs.toFixed(1)} ms（初回 ${b.firstMs.toFixed(0)} ms）`, b.avgMs <= 33);
+    add('baseLayerMs', 'ベース層の作成（20 回平均）', `${b.baseMs.toFixed(1)} ms`);
   } catch (e) {
     add('developMs', `現像 ${N}×${N}（20 回平均）`, `失敗: ${String(e)}`, false);
   }

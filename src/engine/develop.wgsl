@@ -3,21 +3,9 @@
 // 定数（OKLab 行列・HSL 色域の中心など）は develop.ts が TS の値から生成して下の CONSTS の印に入れる。
 // 出力フォーマットは dst の FORMAT の印に入る。8bit 出力のときだけ DITHER = true（パリティ用の float 出力ではディザしない）。
 // 既定値の処理段は uniform の値で分岐して省略する（仕様 3.2）。
+// Params・処理段 1〜3・手動バイリニアは common.wgsl（develop.ts が先頭に連結する。localtone.wgsl と共有）。
 
 /*@CONSTS@*/
-
-struct Params {
-  head: vec4<f32>,            // kind, exposureMul, baseToneMap, outOetf
-  wbMul: vec4<f32>,
-  cam: array<vec4<f32>, 3>,
-  dwb: array<vec4<f32>, 3>,
-  outM: array<vec4<f32>, 3>,
-  tone1: vec4<f32>,           // contrast, whites, blacks, highlights
-  tone2: vec4<f32>,           // shadows, vibrance, saturation, 0
-  hsl: array<vec4<f32>, 8>,
-  grading: array<vec4<f32>, 4>,
-  gradingExtra: vec4<f32>,    // blending, balance
-}
 
 struct Pass {
   m0: vec4<f32>,              // SampleTransform の行 0..2
@@ -34,32 +22,8 @@ struct Pass {
 @group(0) @binding(4) var base: texture_2d<f32>;
 @group(0) @binding(5) var dst: texture_storage_2d</*@FORMAT@*/, write>;
 
-const MID_GRAY: f32 = 0.18;
 const TAU: f32 = 6.283185307179586;
 const PI: f32 = 3.141592653589793;
-
-fn mat3x(m: array<vec4<f32>, 3>, v: vec3<f32>) -> vec3<f32> {
-  return vec3<f32>(dot(m[0].xyz, v), dot(m[1].xyz, v), dot(m[2].xyz, v));
-}
-
-fn luminance(c: vec3<f32>) -> f32 { return dot(LUMA, c); }
-
-// ---- 入力の読み取り（手動バイリニア、端は端の画素） ----
-fn bilinear(t: texture_2d<f32>, mip: u32, uv: vec2<f32>) -> vec4<f32> {
-  let size = textureDimensions(t, mip);
-  let last = vec2<i32>(size) - vec2<i32>(1, 1);
-  let p = uv * vec2<f32>(size) - vec2<f32>(0.5, 0.5);
-  let f0 = floor(p);
-  let f = p - f0;
-  let i0 = vec2<i32>(f0);
-  let a = clamp(i0, vec2<i32>(0, 0), last);
-  let b = clamp(i0 + vec2<i32>(1, 1), vec2<i32>(0, 0), last);
-  let c00 = textureLoad(t, a, i32(mip));
-  let c10 = textureLoad(t, vec2<i32>(b.x, a.y), i32(mip));
-  let c01 = textureLoad(t, vec2<i32>(a.x, b.y), i32(mip));
-  let c11 = textureLoad(t, b, i32(mip));
-  return mix(mix(c00, c10, f.x), mix(c01, c11, f.x), f.y);
-}
 
 // ---- 伝達関数 ----
 fn srgbEotf(v: f32) -> f32 {
@@ -209,18 +173,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let uv = q.xy / q.z;
   let rgbIn = bilinear(src, S.flags.x, uv).xyz;
 
-  var rgb: vec3<f32>;
-  // 1・2
-  if (P.head.x == 1.0) {
-    let c = min(rgbIn * P.wbMul.xyz, vec3<f32>(1.0));
-    let w = smoothstep(0.8, 1.0, min(c.x, min(c.y, c.z)));
-    let m = mat3x(P.cam, c);
-    rgb = mix(m, vec3<f32>(luminance(m)), w);
-  } else {
-    rgb = mat3x(P.dwb, rgbIn);
-  }
-  // 3
-  rgb *= P.head.y;
+  // 1〜3
+  var rgb = linearStages(rgbIn);
   // 4
   if (P.tone1.w != 0.0 || P.tone2.x != 0.0) {
     rgb *= localToneGain(bilinear(base, 0u, uv).x, P.tone1.w, P.tone2.x);

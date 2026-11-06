@@ -63,3 +63,19 @@ test('outRect の外は書かない・恒等 SampleTransform は入力画素の�
   expect(r.outsideUntouched).toBe(true);
   expect(r.insideMaxErr).toBeLessThanOrEqual(1 / 512);
 });
+
+// Task 14: ベース層を使う処理段 4（ベース層は GPU・参照実装とも baseLayerRef の値を使う）
+test('ハイライト／シャドウ ±80 のパリティ（ベース層は両方とも baseLayerRef）', async ({ page }) => {
+  await open(page);
+  const cases = [
+    { name: 'ハイライト +80', params: { basic: { highlights: 80 } }, refBase: true },
+    { name: 'ハイライト −80', params: { basic: { highlights: -80 } }, refBase: true },
+    { name: 'シャドウ +80', params: { basic: { shadows: 80 } }, refBase: true },
+    { name: 'シャドウ −80', params: { basic: { shadows: -80 } }, refBase: true },
+    { name: 'ハイライト −80 シャドウ +80 露光 +1', params: { basic: { highlights: -80, shadows: 80, exposure: 1 } }, refBase: true },
+    { name: 'RAW ハイライト −80 シャドウ +80', params: { basic: { highlights: -80, shadows: 80 } }, img: RAW, refBase: true },
+  ];
+  const results = await page.evaluate((cs) => (window as unknown as W).__engine.developParity(cs), cases);
+  for (const r of results) console.log(`${r.name}: ${(r.maxErr * 512).toFixed(3)}/512 @${r.at}`);
+  expect(results.filter((r) => !(r.maxErr <= 1 / 512))).toEqual([]);
+});

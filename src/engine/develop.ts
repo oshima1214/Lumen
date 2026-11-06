@@ -11,6 +11,7 @@ import { LUMA_2020 } from '../color/tone';
 import { UNIFORM_FLOATS, type Luts } from '../color/uniforms';
 import type { SampleTransform } from './geometry';
 import type { Gpu } from './gpu';
+import commonSrc from './common.wgsl?raw';
 import shaderTemplate from './develop.wgsl?raw';
 
 export interface Rect { x: number; y: number; w: number; h: number }
@@ -27,11 +28,12 @@ const mat = (m: Mat3): string => {
   const col = (c: number) => `vec3<f32>(${f(m[c]!)}, ${f(m[3 + c]!)}, ${f(m[6 + c]!)})`;
   return `mat3x3<f32>(${col(0)}, ${col(1)}, ${col(2)})`;
 };
+export const wgslLuma = (): string => `const LUMA = vec3<f32>(${LUMA_2020.map(f).join(', ')});`;
 const arr = (a: readonly number[]) => `array<f32, ${a.length}>(${a.map(f).join(', ')})`;
 
 export function developShaderSource(format: DevelopOutFormat): string {
   const consts = [
-    `const LUMA = vec3<f32>(${LUMA_2020.map(f).join(', ')});`,
+    wgslLuma(),
     `const REC2020_TO_LMS = ${mat(REC2020_TO_LMS)};`,
     `const LMS_TO_OKLAB = ${mat(LMS_TO_OKLAB)};`,
     `const OKLAB_TO_LMS = ${mat(OKLAB_TO_LMS)};`,
@@ -47,7 +49,7 @@ export function developShaderSource(format: DevelopOutFormat): string {
     `const LUT_N: u32 = ${LUT_SIZE}u;`,
     `const DITHER: bool = ${format === 'rgba8unorm'};`,
   ].join('\n');
-  return shaderTemplate.replace('/*@CONSTS@*/', consts).replace('/*@FORMAT@*/', format);
+  return shaderTemplate.replace('/*@CONSTS@*/', `${consts}\n${commonSrc}`).replace('/*@FORMAT@*/', format);
 }
 
 /** LUT が恒等（x_i = i/(n-1)）なら true */

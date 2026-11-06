@@ -4,7 +4,8 @@ import { readTexture, uploadRgb16 } from '../../../src/engine/upload';
 import { DevelopPass, lumTexture } from '../../../src/engine/develop';
 import { identitySample } from '../../../src/engine/geometry';
 import { buildUniforms, packUniforms, type ImageColorInfo, type OutputSpace } from '../../../src/color/uniforms';
-import { developPixel, luminance2020 } from '../../../src/color/pipeline';
+import { baseLayerRef, developPixel, linearStages, luminance2020 } from '../../../src/color/pipeline';
+import { LocalTonePass, baseLayerMip } from '../../../src/engine/localtone';
 import type { Vec3 } from '../../../src/color/spaces';
 import { defaultParams } from '../../../src/params/defaults';
 import { deepMerge } from '../../../src/params/partial';
@@ -61,19 +62,26 @@ export function testImage(w: number, h: number): Uint16Array {
   return d;
 }
 
-export interface ParityCase { name: string; params: DeepPartial<DevelopParams>; img?: ImageColorInfo; out?: OutputSpace }
+/** refBase: ベース層に（入力と同寸の）baseLayerRef を使う。省略時は画素の輝度そのもの */
+export interface ParityCase { name: string; params: DeepPartial<DevelopParams>; img?: ImageColorInfo; out?: OutputSpace; refBase?: boolean }
 export interface ParityResult { name: string; maxErr: number; at: string }
 
 interface Fixture { src: Float32Array; lum: Float32Array; img: ReturnType<typeof uploadRgb16>; base: GPUTexture; w: number; h: number }
 
-async function fixture(w: number, h: number, baseLum?: (src: Float32Array) => Float32Array): Promise<Fixture> {
+async function fixture(w: number, h: number): Promise<Fixture> {
   const g = await gpu();
   const img = uploadRgb16(g, testImage(w, h), w, h);
   const src = await readTexture(g, img.texture, 0);   // rgba16float に量子化された入力をそのまま参照実装へ渡す
-  let lum = new Float32Array(w * h);
+  const lum = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) lum[i] = luminance2020([src[i * 4]!, src[i * 4 + 1]!, src[i * 4 + 2]!]);
-  if (baseLum) lum = Float32Array.from(baseLum(src));
   return { src, lum, img, base: lumTexture(g, lum, w, h), w, h };
+}
+
+/** 処理段 1〜3 後の輝度（rgba の配列から） */
+function stageLum(src: Float32Array, n: number, u: ReturnType<typeof buildUniforms>['u']): Float32Array {
+  const lum = new Float32Array(n);
+  for (let i = 0; i < n; i++) lum[i] = luminance2020(linearStages([src[i * 4]!, src[i * 4 + 1]!, src[i * 4 + 2]!], u));
+  return lum;
 }
 
 function outTexture(g: Gpu, w: number, h: number): GPUTexture {
@@ -107,9 +115,15 @@ async function developParity(cases: ParityCase[]): Promise<ParityResult[]> {
   const results: ParityResult[] = [];
   for (const c of cases) {
     const built = buildUniforms(deepMerge<DevelopParams>(defaultParams(), c.params), c.img ?? { kind: 'display' }, c.out ?? 'srgb');
+    let cfx = fx;
+    if (c.refBase) {
+      const lum = baseLayerRef(stageLum(fx.src, W * H, built.u), W, H);
+      cfx = { ...fx, lum, base: lumTexture(g, lum, W, H) };
+    }
     pass.setLuts(built.luts);
-    pass.run(fx.img.texture, 0, fx.base, packUniforms(built.u), out, { x: 0, y: 0, w: W, h: H }, identitySample(W, H));
-    results.push(compare(c.name, fx, await readTexture(g, out), built));
+    pass.run(fx.img.texture, 0, cfx.base, packUniforms(built.u), out, { x: 0, y: 0, w: W, h: H }, identitySample(W, H));
+    results.push(compare(c.name, cfx, await readTexture(g, out), built));
+    if (cfx !== fx) cfx.base.destroy();
   }
   pass.destroy();
   out.destroy();
@@ -140,7 +154,71 @@ async function developRect() {
   return { outsideUntouched, insideMaxErr: res.maxErr };
 }
 
-const harness = { uploadAndRead, uploadInfo, developParity, developRect };
+/** Task 14: GPU のベース層と baseLayerRef（同じミップ段の入力から）を比べる */
+async function baseLayerParity(w: number, h: number, params: DeepPartial<DevelopParams>, info: ImageColorInfo) {
+  const g = await gpu();
+  const img = uploadRgb16(g, testImage(w, h), w, h);
+  const { u } = buildUniforms(deepMerge<DevelopParams>(defaultParams(), params), info, 'srgb');
+  const pass = new LocalTonePass(g);
+  const base = pass.build(img, packUniforms(u));
+  const gpuBase = await readTexture(g, base, 0);
+  const mip = baseLayerMip(w, h);
+  const src = await readTexture(g, img.texture, mip);
+  const bw = base.width, bh = base.height;
+  if (src.length !== bw * bh * 4) throw new Error(`ミップ ${mip} の大きさがベース層と違う`);
+  const ref = baseLayerRef(stageLum(src, bw * bh, u), bw, bh);
+  let maxErr = 0, at = '';
+  for (let i = 0; i < bw * bh; i++) {
+    const e = Math.abs(gpuBase[i]! - ref[i]!) / Math.max(1, ref[i]!);
+    if (!(e <= maxErr)) { maxErr = Number.isNaN(e) ? Infinity : e; at = `${i % bw},${Math.floor(i / bw)} gpu=${gpuBase[i]} ref=${ref[i]}`; }
+  }
+  const res = { width: bw, height: bh, format: base.format, mip, maxErr, at };
+  pass.destroy();
+  img.destroy();
+  return res;
+}
+
+/**
+ * Task 14: 左半分が暗い灰色（0.02）・右半分が明るい灰色（0.6）の 512×256 画像を、LocalTonePass のベース層で現像し、
+ * params ありと既定値の出力（sRGB エンコード値）の差を、ベース層の輝度で暗部（< 0.05）と明部（≥ 0.18）に分けて集計する。
+ */
+async function localToneEffect(params: DeepPartial<DevelopParams>) {
+  const g = await gpu();
+  const W = 512, H = 256;
+  const data = new Uint16Array(W * H * 3);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const v = Math.round((x < W / 2 ? 0.02 : 0.6) * (1 + 0.05 * Math.sin(x * 0.7 + y * 1.3)) * 65535);
+    data.set([v, v, v], (y * W + x) * 3);
+  }
+  const img = uploadRgb16(g, data, W, H);
+  const lt = new LocalTonePass(g);
+  const dp = new DevelopPass(g);
+  const out = outTexture(g, W, H);
+  const render = async (p: DeepPartial<DevelopParams>) => {
+    const { u, luts } = buildUniforms(deepMerge<DevelopParams>(defaultParams(), p), { kind: 'display' }, 'srgb');
+    const packed = packUniforms(u);
+    const base = lt.build(img, packed);
+    dp.setLuts(luts);
+    dp.run(img.texture, 0, base, packed, out, { x: 0, y: 0, w: W, h: H }, identitySample(W, H));
+    return { px: await readTexture(g, out), base: await readTexture(g, base) };
+  };
+  const ref = await render({});
+  const adj = await render(params);
+  let darkMaxDiff = 0, brightMaxDiff = 0, darkSum = 0, brightSum = 0, nd = 0, nb = 0;
+  for (let i = 0; i < W * H; i++) {
+    const d = adj.px[i * 4 + 1]! - ref.px[i * 4 + 1]!;
+    const b = ref.base[i]!;   // ベース層は作業画像と同寸（長辺 512）
+    if (b < 0.05) { darkMaxDiff = Math.max(darkMaxDiff, Math.abs(d)); darkSum += d; nd++; }
+    if (b >= 0.18) { brightMaxDiff = Math.max(brightMaxDiff, Math.abs(d)); brightSum += d; nb++; }
+  }
+  lt.destroy();
+  dp.destroy();
+  img.destroy();
+  out.destroy();
+  return { darkMaxDiff, brightMaxDiff, darkMeanDiff: darkSum / nd, brightMeanDiff: brightSum / nb, nd, nb };
+}
+
+const harness = { uploadAndRead, uploadInfo, developParity, developRect, baseLayerParity, localToneEffect };
 export type EngineHarness = typeof harness;
 
 (window as unknown as { __engine: EngineHarness }).__engine = harness;
