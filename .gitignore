@@ -1,0 +1,7 @@
+node_modules
+dist
+test-assets/
+.samples/
+.superpowers/
+test-results/
+playwright-report/
