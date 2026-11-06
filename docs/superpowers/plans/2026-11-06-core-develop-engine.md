@@ -396,6 +396,19 @@ docs/iphone-checklist.md
 
 ---
 
+### Task 10b: JPEG XL 圧縮 ProRAW（後回し・サンプル入手後）
+
+Task 10 の検証で、同梱 LibRaw は JPEG XL 圧縮 DNG に非対応と判明した（`docs/decisions/libraw-wasm.md`）。
+
+**Files:** Create `src/decode/jxl-dng.ts`、Test: `tests/e2e/decode-jxl.spec.ts`
+
+- [ ] **Step 1:** iPhone 16 Pro 以降で「ProRAW（JPEG XL）」設定で撮った DNG を `test-assets/proraw-jxl.dng` に置いてもらう。
+- [ ] **Step 2: 失敗するテスト** — `decodeRaw` が `kind 'raw'`、寸法が DNG の ImageWidth/ImageLength と一致、撮影時色温度が 2500〜10000K。
+- [ ] **Step 3:** 実装方針: libjxl の WASM デコーダー（BSD）で DNG のタイルを展開し、ColorMatrix / AsShotNeutral は TIFF タグから読む。`decodeRaw` は LibRaw が失敗した DNG のうち Compression=52546 のものをこの経路に回す。
+- [ ] **Step 4:** PASS を確認しコミット `feat(decode): JPEG XL 圧縮 ProRAW`
+
+---
+
 ### Task 11: デコード Worker とクライアント
 
 **Files:**
