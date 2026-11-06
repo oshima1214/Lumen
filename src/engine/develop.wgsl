@@ -206,7 +206,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   if (P.head.w == 1.0) { o = vec3<f32>(srgbOetf(o.x), srgbOetf(o.y), srgbOetf(o.z)); }
   if (DITHER) {
     let n = vec3<f32>(hash(px, 1u) + hash(px, 2u), hash(px, 3u) + hash(px, 4u), hash(px, 5u) + hash(px, 6u)) - 1.0;
-    o = clamp(o + n / 255.0, vec3<f32>(0.0), vec3<f32>(1.0));
+    // 白飛び（1）・黒つぶれ（0）の画素はディザしない（ヒストグラムのクリップ警告を正しく数えるため）
+    let interior = step(vec3<f32>(0.5 / 255.0), o) * step(o, vec3<f32>(1.0 - 0.5 / 255.0));
+    o = clamp(o + interior * n / 255.0, vec3<f32>(0.0), vec3<f32>(1.0));
   }
   textureStore(dst, px, vec4<f32>(o, 1.0));
 }

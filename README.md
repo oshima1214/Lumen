@@ -10,4 +10,4 @@
 
 ### テスト環境の WebGPU
 ヘッドレス Chromium では次の起動引数で SwiftShader の WebGPU アダプタが取得できる（`playwright.config.ts`）:
-`--enable-unsafe-webgpu --enable-features=Vulkan --use-angle=swiftshader --use-webgpu-adapter=swiftshader`
+`--enable-unsafe-webgpu --enable-features=Vulkan --use-angle=swiftshader --use-webgpu-adapter=swiftshader --use-vulkan=swiftshader --enable-unsafe-swiftshader`（最後の 2 つが無いと WebGPU canvas の getCurrentTexture でデバイスが失われる）
