@@ -1,8 +1,8 @@
 # コア現像エンジン 設計仕様（サブプロジェクト1）
 
 - 日付: 2026-11-06
-- ステータス: レビュー待ち
-- 仮称: **Lumen**（名称は後で変更可。サイドカーの `app` フィールドにのみ使用）
+- ステータス: レビュー待ち（改訂2: iPhone 対応、無料運用、見た目を追加）
+- 仮称: **Lumen**（ラテン語で「光」。名称は後で変更可。サイドカーの `app` フィールドにのみ使用。既存製品と同名のため公開時は再検討）
 
 ## 1. 目的と前提
 
@@ -13,9 +13,11 @@ Adobe Lightroom の現像機能に匹敵する写真編集を、**ブラウザ�
 ### 1.2 利用者と成功基準
 - 利用者: 本人および身近な人。各自が自分の PC で使う個人ツール（公開・課金・マルチユーザーは対象外）。
 - 成功基準:
-  - 手持ちの RAW（Canon EOS 20D / Nikon D5300）と iPhone 15 の HEIC・JPEG を開き、Lightroom の基本補正・トーンカーブ・HSL・カラーグレーディング・切り抜きに相当する編集ができる。
+  - PC と iPhone のブラウザの両方で動く。
+  - 手持ちの RAW（Canon EOS 20D / Nikon D5300）と iPhone 各機種の写真（HEIC・JPEG・ProRAW）を開き、Lightroom の基本補正・トーンカーブ・HSL・カラーグレーディング・切り抜きに相当する編集ができる。
   - スライダー操作が滑らか（プレビューで 16ms 以内に再描画）。
-  - 編集は非破壊で、写真の隣のサイドカー JSON に保存され、フォルダごと移動・別 PC で開いても再現される。
+  - 編集は非破壊。PC では写真の隣のサイドカー JSON に保存され、フォルダごと移動・別 PC で開いても再現される。iPhone ではアプリ内ライブラリに同じ形式で保存される。
+  - 開発・運用費が無料（独自ドメイン等の任意費用を除く）。
   - プリセットと設定のコピー＆ペーストで複数写真へ一括適用できる。
   - サイズ・画質・透かしを指定して JPEG/PNG に書き出せる。
 
@@ -23,19 +25,38 @@ Adobe Lightroom の現像機能に匹敵する写真編集を、**ブラウザ�
 | 項目 | 決定 |
 |---|---|
 | 用途 | 個人ツール |
-| 入力形式 | RAW と JPEG/HEIC を同等に扱う |
+| 入力形式 | RAW と JPEG/HEIC を同等に扱う。iPhone は全機種の形式に対応 |
 | 実行形態 | 完全ローカル（ブラウザ内で完結、サーバーなし） |
-| 編集の保存 | 写真の隣にサイドカー JSON |
+| 対象ブラウザ | PC の Chrome / Edge と iPhone の Safari（ほか WebGPU 対応ブラウザ） |
+| 編集の保存 | サイドカー JSON。PC はフォルダ方式（写真の隣）、iPhone 等はライブラリ方式（OPFS 内） |
 | 技術方式 | TypeScript + WebGPU（案A） |
 | UI フレームワーク | Svelte 5（Vite） |
+| 費用 | 開発・運用とも無料。有料要素が必要になったら都度相談 |
 
 ### 1.4 対象環境
-- デスクトップ版 Chrome / Edge（最新安定版）。WebGPU と File System Access API が必須。
-- 対象カメラ・形式:
-  - Canon EOS 20D: CR2（ベイヤー）
-  - Nikon D5300: NEF（ベイヤー）
-  - iPhone 15（無印）: HEIC / JPEG（ProRAW は非対応機種のため対象外）
-  - 汎用: JPEG / PNG。DNG は LibRaw が読める範囲で対応（保証はしない）。
+WebGPU は必須。保存方式はブラウザの機能で自動選択する（2.4）。
+
+| 環境 | 保存方式 | 備考 |
+|---|---|---|
+| PC の Chrome / Edge（最新安定版） | フォルダ方式 | File System Access API を使用 |
+| iPhone の Safari（iOS 26 以降）。iPhone 上の他ブラウザも中身は同じ | ライブラリ方式 | ホーム画面に追加（PWA）して使うことを推奨 |
+| PC の Safari / Firefox（WebGPU 有効時） | ライブラリ方式 | 動作は保証しないが動くよう作る |
+
+対象カメラ・形式:
+
+| 形式 | 対象 | 対応方法 |
+|---|---|---|
+| CR2 | Canon EOS 20D | LibRaw（ベイヤー、デモザイクあり） |
+| NEF | Nikon D5300 | LibRaw（ベイヤー、デモザイクあり） |
+| JPEG / PNG | 全般、全 iPhone | ブラウザ標準 |
+| HEIC / HEIF（48MP の HEIF Max を含む） | iPhone 7 以降 | Safari は標準デコード、PC の Chrome / Edge は libheif-WASM |
+| Apple ProRAW（DNG、リニア・デモザイク済み） | iPhone 12 Pro 以降の Pro 系 | LibRaw（デモザイクを省略） |
+| ProRAW（JPEG XL 圧縮） | iPhone 16 Pro 以降の一部設定 | **要検証**。LibRaw が非対応なら libjxl-WASM を追加 |
+| サードパーティアプリの DNG（ベイヤー） | 各 iPhone | LibRaw |
+| その他の DNG | — | LibRaw が読める範囲で対応（保証しない） |
+
+- HDR 写真（HEIC のゲインマップ）は v1 では SDR のベース画像として扱う。
+- 実機のテスト用サンプルは現時点で未提供。デコードの実ファイルテストはサンプル入手まで保留する（8章）。
 
 ### 1.5 全体ロードマップと本仕様の範囲
 | # | サブプロジェクト | 本仕様 |
@@ -45,43 +66,48 @@ Adobe Lightroom の現像機能に匹敵する写真編集を、**ブラウザ�
 | 3 | 部分補正（線形・円形グラデーション、ブラシ） | 対象外 |
 | 4 | AI マスク（被写体・空の選択） | 対象外 |
 
-**本仕様で明示的に扱わないもの**: ライブラリ／カタログ（キーワード、コレクション、検索）、クラウド同期、XMP 互換、明瞭度・テクスチャ・かすみ除去、ノイズ除去、レンズ補正、部分補正、タイル分割レンダリング。
+**本仕様で明示的に扱わないもの**: 本格的なライブラリ／カタログ（キーワード、コレクション、検索）、クラウド同期・端末間同期、XMP 互換、明瞭度・テクスチャ・かすみ除去、ノイズ除去、レンズ補正、部分補正、HDR 編集・HDR 書き出し、ライトモード、日本語以外の UI 言語。
 
 ## 2. アーキテクチャ
 
 ### 2.1 構成図
 ```
 ┌─────────────── メインスレッド（Svelte UI）───────────────┐
-│ FolderBrowser │ Filmstrip │ Viewer(canvas) │ DevelopPanel │
+│ Browser(Folder/Library) │ Filmstrip │ Viewer │ DevelopPanel │
 │        │                       ▲                 │       │
 │        ▼                       │                 ▼       │
-│   fs/  ─────────────►  store/ (編集状態・Undo履歴)        │
-│  (File System Access)          │                         │
+│ storage/ ───────────►  store/ (編集状態・Undo履歴)        │
+│  ├ FolderBackend  (File System Access, PC Chrome/Edge)   │
+│  └ LibraryBackend (OPFS, iPhone Safari ほか)             │
+│        │                       │                         │
 │        │                       ▼                         │
 │        │              engine/ (WebGPUパイプライン)        │
 │        ▼                       ▲                         │
 │  decode-worker (Web Worker) ───┘ linear float RGB         │
 │   ├ LibRaw-WASM  (CR2 / NEF / DNG)                       │
-│   ├ libheif-WASM (HEIC)                                  │
-│   └ createImageBitmap (JPEG / PNG)                       │
+│   ├ libheif-WASM (HEIC、Safari 以外)                      │
+│   ├ libjxl-WASM  (JPEG XL 圧縮 ProRAW、必要な場合のみ)    │
+│   └ createImageBitmap (JPEG / PNG / Safari の HEIC)       │
 └──────────────────────────────────────────────────────────┘
 ```
 
 ### 2.2 モジュール
 | モジュール | 責務 | 公開インターフェース | 依存 |
 |---|---|---|---|
-| `fs/` | フォルダを開く、画像の一覧、サイドカーの読み書き、フォルダハンドルの永続化（IndexedDB）と権限の再取得 | `openFolder()`, `restoreFolders()`, `listImages(dir)`, `readSidecar(file)`, `writeSidecar(file, data)` | File System Access API |
-| `decode/` | Worker 内でファイルをデコードし `DecodedImage` を返す。埋め込みプレビューの抽出 | `decode(file): Promise<DecodedImage>`, `extractPreview(file): Promise<ImageBitmap>` | LibRaw-WASM, libheif-WASM |
+| `storage/` | 画像の取り込み・一覧、元画像の読み出し、サイドカー・プリセットの読み書き、書き出し先への保存。2 実装を持つ（2.4） | `StorageBackend`（2.4） | File System Access API / OPFS |
+| `decode/` | Worker 内でファイルをデコードし `DecodedImage` を返す。埋め込みプレビューの抽出 | `decode(file, opts): Promise<DecodedImage>`, `extractPreview(file): Promise<ImageBitmap>` | LibRaw-WASM, libheif-WASM, libjxl-WASM |
 | `params/` | 現像パラメータの型、既定値、スキーマのバージョン移行、部分適用、差分のシリアライズ。**純粋関数のみ** | `DevelopParams`, `defaultParams()`, `migrate(json)`, `applyPartial(base, partial)`, `toSidecar(params)`, `fromSidecar(json)` | なし |
 | `color/` | 色計算の参照実装（WB、行列、色温度⇔xy、OKLCh、トーンカーブ評価）。TS と WGSL で同じ式を持つ | 関数群 | なし |
-| `engine/` | WebGPU パイプライン。`DecodedImage` と `DevelopParams` から描画 | `loadImage(img)`, `render(params, viewport)`, `renderFull(params): Promise<Float32Array/ImageData>`, `histogram()` | WebGPU, `color/` |
-| `store/` | 選択状態、現在のパラメータ、Undo/Redo、サイドカーへのデバウンス保存 | Svelte のストア | `params/`, `fs/` |
-| `export/` | フル解像度で現像、リサイズ、出力シャープ、透かし、エンコード、EXIF 付加、保存 | `exportImages(files, settings, onProgress, signal)` | `engine/`, `fs/` |
+| `engine/` | WebGPU パイプライン。`DecodedImage` と `DevelopParams` から描画。書き出しはタイル単位 | `loadImage(img)`, `render(params, viewport)`, `renderTile(params, rect)`, `histogram()` | WebGPU, `color/` |
+| `store/` | 選択状態、現在のパラメータ、Undo/Redo、サイドカーへのデバウンス保存 | Svelte のストア | `params/`, `storage/` |
+| `export/` | タイル単位でフル解像度現像、リサイズ、出力シャープ、透かし、エンコード、EXIF 付加、保存 | `exportImages(ids, settings, onProgress, signal)` | `engine/`, `storage/` |
+| `platform/` | 実行環境の判定（WebGPU、File System Access、OPFS、端末種別、メモリ上限の目安）と保存方式の選択 | `detectPlatform(): Platform` | なし |
 | `cache/` | サムネイルと中間プレビューの IndexedDB キャッシュ（キー: パス＋サイズ＋更新日時） | `get(key)`, `put(key, blob)` | IndexedDB |
 
 設計上の原則:
 - `params/` と `color/` は UI・GPU・ファイルに依存しない。単体テストの中心とする。
 - `engine/` はファイルの存在を知らない。後続サブプロジェクトは処理段の追加で拡張する。
+- `storage/` より上の層は、PC とiPhone のどちらで動いているかを意識しない（違いは `StorageBackend` と UI レイアウトに閉じ込める）。
 - デコードとエンコードは Worker で行い、メインスレッドを止めない。
 
 ### 2.3 データ型（要点）
@@ -98,12 +124,45 @@ interface DecodedImage {
 }
 ```
 
+### 2.4 保存方式（StorageBackend）
+```ts
+interface ImageRef { id: string; name: string; size: number; mtime: number; group: string }
+
+interface StorageBackend {
+  kind: 'folder' | 'library';
+  addSource(): Promise<void>;                 // folder: フォルダ選択 / library: 写真の取り込み
+  list(): Promise<ImageRef[]>;
+  readOriginal(id: string): Promise<File>;
+  readSidecar(id: string): Promise<unknown | null>;
+  writeSidecar(id: string, data: unknown): Promise<void>;
+  remove?(id: string): Promise<void>;         // library のみ（ライブラリから削除）
+  presets: PresetStore;
+  saveExport(name: string, blob: Blob): Promise<void>;
+}
+```
+
+| | FolderBackend（PC の Chrome / Edge） | LibraryBackend（iPhone Safari ほか） |
+|---|---|---|
+| 取り込み | `showDirectoryPicker()` でフォルダを開く。ハンドルは IndexedDB に保存し、再起動後に権限を再取得 | `<input type="file" multiple>` で「写真」または「ファイル」から選び、OPFS の `library/<id>/` に**コピー** |
+| `group` | フォルダの相対パス | 取り込み日（`YYYY-MM-DD`） |
+| サイドカー | 写真の隣に `<元ファイル名>.json` | `library/<id>/sidecar.json`（同じ形式） |
+| プリセット | ユーザーが指定するプリセットフォルダ | OPFS の `presets/` |
+| 書き出し | ユーザーが指定する書き出しフォルダ | 共有シート（`navigator.share({ files })`）→「画像を保存」で写真アプリへ。共有非対応時はダウンロード |
+| データ保護 | 元ファイルはユーザーのフォルダにある | `navigator.storage.persist()` を要求。ホーム画面への追加（PWA）を案内する（Safari が 7 日間未使用のサイトデータを消すことへの対策）。「データはこの端末内だけにある」ことを明示 |
+
+- ライブラリ方式では、取り込み時に空き容量を `navigator.storage.estimate()` で確認し、不足する場合は取り込み前に警告する。
+- ライブラリ方式の取り込みでは、iOS が HEIC / ProRAW を JPEG に変換して渡すことがある。受け取った形式が元と違う場合（拡張子・MIME で判定）、「『ファイル』から選ぶとオリジナルのまま取り込める」と案内する（要実機検証、10章）。
+
 ## 3. 現像パイプライン
 
 ### 3.1 デコード（Worker、1画像1回）
 - **RAW**: LibRaw でデモザイク（AHD）。WB 係数 1、自動明るさなし、ガンマ 1.0、出力はカメラ RGB（`output_color=0`）、16bit。カメラ行列（`cam_xyz`）、撮影時 WB、黒・白レベルも取得。
+- **ProRAW（リニア DNG）**: LibRaw で読み込み、デモザイクは行わない。DNG のカラーマトリクスと撮影時 WB を使い、以降は RAW と同じ扱い（`kind: 'raw'`）。JPEG XL 圧縮の場合は libjxl-WASM で展開してから同じ処理に渡す（LibRaw が直接対応していればそれを使う）。
 - **JPEG/PNG**: `createImageBitmap` で取得後、sRGB（ICC が Display P3 なら P3）をリニア化し Rec.2020 へ変換。
-- **HEIC**: libheif-WASM でデコード。iPhone は Display P3 → リニア Rec.2020。
+- **HEIC**: Safari では `createImageBitmap` で、それ以外では libheif-WASM でデコード。iPhone は Display P3 → リニア Rec.2020。ゲインマップは無視する。
+- **2 種類の画像を保持する**:
+  - **元データ**: デコード結果のフル解像度。Worker 内の CPU バッファに 16bit 整数で保持し、GPU には載せない。書き出し時にタイルごとに切り出して GPU へ送る。開いている 1 枚分だけを保持する。
+  - **作業画像**: 元データを長辺の上限（`platform/` が決める。PC 8192px、iPhone 4096px）以下に縮小し、GPU に `rgba16float` で載せる。プレビューと 100% 表示はこちらから描画する。
 - GPU 側では `rgba16float` テクスチャにアップロードし、ミップマップのピラミッドを生成する。
 
 ### 3.2 GPU の処理段（WGSL コンピュートシェーダー）
@@ -130,15 +189,20 @@ interface DecodedImage {
 - EXIF の向きは切り抜きより前に適用する。
 
 ### 3.4 解像度とパフォーマンス
-- 編集中は、表示サイズに合うピラミッドの段（長辺 2560px 程度まで）で描画する。
-- 100% 表示では、見えている範囲をフル解像度の元画像から描画する。
-- 書き出しはフル解像度で一括処理する。対象機種の最大寸法（約 6000px）は WebGPU の `maxTextureDimension2D` 8192 以内のため、タイル分割はしない。上限を超える画像は「非対応サイズ」として明示的にエラーにする。
-- 目標: プレビューのスライダー操作から描画まで 16ms 以内。24MP の RAW の読み込みは 3 秒以内（一般的なノート PC）。
+- 編集中は、表示サイズに合うピラミッドの段（PC は長辺 2560px、iPhone は 2048px 程度まで）で描画する。
+- 100% 表示では、見えている範囲を作業画像（3.1 の縮小デコード上限まで）から描画する。iPhone で 48MP の写真は、100% 表示も 4096px の作業画像からの拡大になる（v1 の制約）。
+- **書き出しはタイル分割**（1 タイル 2048px 角、周囲に 32px の重なり）で行う。メモリが厳しい iPhone と、`maxTextureDimension2D` を超える画像の両方に対応するため。
+  - 処理段 4 のベース層は縮小画像から作った 1 枚を全タイルで共有するので、タイルの境目で明るさが変わらない。
+  - Lanczos 縮小と出力シャープは近傍の画素を使うため、重なり部分を含めて計算し、重なりを捨てて結合する。
+  - 縮小書き出しの場合は、先に縮小率に合わせたタイル計画を立て、出力サイズのバッファだけを確保する。
+- 目標:
+  - PC: プレビューのスライダー操作から描画まで 16ms 以内。24MP の RAW の読み込みは 3 秒以内（一般的なノート PC）。
+  - iPhone（iPhone 15 相当）: プレビュー描画 33ms 以内（30fps）。48MP の書き出しがメモリ不足で落ちずに完了すること。
 
 ## 4. パラメータとサイドカー
 
 ### 4.1 サイドカー形式
-ファイル名は `<元ファイル名>.json`（例: `IMG_0001.NEF.json`）。
+フォルダ方式ではファイル名 `<元ファイル名>.json`（例: `IMG_0001.NEF.json`）、ライブラリ方式では `library/<id>/sidecar.json`。中身の形式は共通。
 
 ```jsonc
 {
@@ -178,7 +242,8 @@ interface DecodedImage {
 ### 4.3 プリセット
 - プリセットは `params` の部分集合（`Partial<DevelopParams>` の深い部分集合）＋名前。
 - 適用は `applyPartial()`。含まれる項目だけを上書きする。
-- 保存先はユーザーが指定するプリセットフォルダ（`presets/*.json`）。フォルダハンドルは IndexedDB に保持。
+- 保存先は `StorageBackend.presets`。フォルダ方式ではユーザーが指定するプリセットフォルダ（`presets/*.json`、ハンドルは IndexedDB に保持）、ライブラリ方式では OPFS の `presets/`。
+- プリセットの読み込み・書き出し（JSON ファイル）で、PC と iPhone の間で手動で受け渡しできる。
 - 組み込みプリセット: モノクロ、高コントラスト、フィルム調、ソフトの 4 種。
 
 ### 4.4 コピー＆ペースト／一括適用
@@ -192,28 +257,61 @@ interface DecodedImage {
 
 ## 5. UI
 
-- **左**: フォルダツリー（開いたフォルダとサブフォルダ）、プリセット一覧
+### 5.1 レイアウト（画面幅で切り替え）
+**PC（幅 1024px 以上）**
+- **左**: フォルダツリー（フォルダ方式）または取り込み日の一覧（ライブラリ方式）、プリセット一覧
 - **中央**: ビューア（画面に合わせる／100%、ドラッグで移動、`\` で編集前後の比較）
 - **右**: ヒストグラム、パネル（基本補正 / トーンカーブ / HSL / カラーグレーディング / 切り抜き）。スライダーのダブルクリックで既定値に戻す
 - **下**: フィルムストリップ。サムネイルは IndexedDB キャッシュ。RAW は埋め込み JPEG を先に表示
 - **ショートカット**: ←→ 画像送り、Ctrl+Z / Ctrl+Shift+Z 取り消し／やり直し、Ctrl+Shift+C / V 設定のコピー／ペースト、R 切り抜き、Ctrl+Shift+E 書き出し、0〜5 レーティング
 
+**iPhone（幅 1024px 未満、縦画面）**
+- **一覧画面**: サムネイルのグリッド。右下に「＋（取り込み）」ボタン。長押しで複数選択（設定のペースト、書き出し、削除）
+- **編集画面**: 上に写真（ピンチで拡大、2 本指で移動、**長押しで編集前を表示**、左右スワイプで画像送り）。下にツールのタブ（ライト / カラー / カーブ / HSL / グレーディング / 切り抜き / プリセット）、その上に選択中のタブのスライダー群。ヒストグラムは折りたたみ表示
+- 上部: 戻る、取り消し／やり直し、書き出し（共有）、「…」メニュー（設定のコピー／ペースト）
+- 片手操作を想定し、操作要素は画面下半分に集める。タップ領域は 44px 以上。スライダーは値の数字をタップして直接入力できる
+
+### 5.2 見た目と配色
+方針: **UI が写真の色の判断を邪魔しない**こと。
+
+| トークン | 値 | 用途 |
+|---|---|---|
+| `--bg` | `#1C1C1C` | アプリ背景 |
+| `--panel` | `#252525` | パネル |
+| `--line` | `#333333` | 区切り線 |
+| `--text` | `#E6E6E6` | 本文 |
+| `--text-sub` | `#9A9A9A` | 補助テキスト、単位 |
+| `--accent` | `#D9A441` | 選択中、スライダーのつまみ、主ボタン（面積は最小限） |
+| `--danger` | `#E5484D` | エラー、削除 |
+
+- 基調は色みのない（無彩色の）ダークグレー。ライトモードは作らない。
+- 写真周囲の背景は 黒 / ダークグレー（`--bg`）/ 18% グレー（`#777777`）から選べる。
+- 色を使うのは意味がある箇所だけ: 色温度スライダー（青→黄）、色かぶり（緑→マゼンタ）、HSL の各色、ヒストグラム（R・G・B の重ね表示と白飛び・黒つぶれの警告）。
+- 文字: システムフォント（`system-ui`。iPhone はヒラギノ、PC は OS 標準）。数値は等幅数字（`font-variant-numeric: tabular-nums`）。
+- アイコン: Lucide（ISC ライセンス、無料）。
+- UI 言語は日本語のみ。
+
 ## 6. 書き出し
 
 - 設定: 形式（JPEG / PNG）、JPEG 品質（1〜100）、長辺ピクセル数（または原寸）、色空間（sRGB / Display P3）、出力シャープ（なし / 弱 / 標準 / 強）、ファイル名ルール（`{name}`, `{seq}`, `{date}`）、透かし（文字または画像、9 方向の位置、大きさ、不透明度）、GPS を除去するかどうか。
-- 保存先: ユーザーが指定する書き出しフォルダ。同名ファイルは連番を付けて回避（上書きしない）。
-- 処理: GPU でフル解像度現像 → Lanczos 縮小 → 出力シャープ（アンシャープマスク）→ 透かし合成 → Worker でエンコード（JPEG は MozJPEG-WASM、PNG はブラウザ標準）→ EXIF 付加（撮影日時、機種、レンズ、露出情報、ICC プロファイル。GPS は設定に従う）。
+- 保存先: `StorageBackend.saveExport()`。フォルダ方式は指定した書き出しフォルダ（同名ファイルは連番を付けて回避し、上書きしない）。ライブラリ方式は共有シートで写真アプリへ保存（複数枚はまとめて共有）。
+- 処理: GPU でタイル単位にフル解像度現像（3.4）→ Lanczos 縮小 → 出力シャープ（アンシャープマスク）→ 透かし合成 → Worker でエンコード（JPEG は MozJPEG-WASM、PNG はブラウザ標準）→ EXIF 付加（撮影日時、機種、レンズ、露出情報、ICC プロファイル。GPS は設定に従う）。
 - 一括処理は 1 枚ずつ順に実行。進捗表示とキャンセル（`AbortSignal`）に対応。失敗した写真はスキップし、最後に一覧で報告。
 
 ## 7. エラー処理
 
 | 状況 | 振る舞い |
 |---|---|
-| WebGPU / File System Access API がない | 起動時に判定し、必要なブラウザと理由を表示して停止 |
+| WebGPU がない | 起動時に判定し、必要なブラウザ・OS バージョンと理由を表示して停止 |
+| File System Access API がない | ライブラリ方式で起動（エラーにしない） |
+| OPFS もない | 必要なブラウザを表示して停止 |
 | デコード失敗・非対応形式 | その写真だけエラーのサムネイルにして理由を表示、他は継続 |
-| 画像が `maxTextureDimension2D` を超える | 非対応サイズとして明示的にエラー |
-| GPU デバイス喪失（`device.lost`） | デバイスを再作成し、現在の画像とパラメータから再描画 |
+| 取り込み時に容量不足 | 取り込み前に警告し、必要量と空き容量を表示 |
+| iOS が JPEG に変換して渡した | 取り込みは行い、「ファイル」から選び直す方法を案内 |
+| GPU デバイス喪失（`device.lost`）。iPhone でアプリを切り替えた後にも起こる | デバイスを再作成し、現在の画像とパラメータから再描画 |
+| メモリ不足の兆候（GPU のメモリ確保失敗） | 作業画像の上限を一段下げて再試行し、その旨を表示 |
 | フォルダ権限の失効（再起動後など） | 「アクセスを再許可」ボタンを表示 |
+| 永続化が許可されていない（ライブラリ方式） | 設定画面に「データが消える可能性」とホーム画面への追加手順を表示 |
 | サイドカー書き込み失敗 | 画面上部に警告を常時表示。編集はメモリに保持し、次の操作時に再試行 |
 | サイドカー破損・新しすぎるスキーマ | 4.2 の規則に従う |
 | 書き出し中の失敗 | 該当写真をスキップし、終了時に一覧表示 |
@@ -222,22 +320,46 @@ interface DecodedImage {
 
 - **単体テスト（Vitest、TDD）**: `params/`（既定値、差分シリアライズ、移行、部分適用、コピー対象の選択）、`color/`（色温度⇔xy、WB 倍率、行列、OKLCh 往復、トーンカーブの単調性）。
 - **GPU と参照実装の一致**: `color/` の TS 参照実装と WGSL の出力を、小さな合成テスト画像で比較（許容誤差つき、Playwright + Chromium の WebGPU で実行）。
-- **デコード**: EOS 20D の CR2、D5300 の NEF、iPhone 15 の HEIC、JPEG を各 1 枚以上テスト用に用意し、寸法・向き・メタデータ・代表画素値を検証。**サンプルファイルはユーザーから提供を受ける**（リポジトリにはコミットせず、`test-assets/` を `.gitignore` に入れてローカルに置く）。サンプルがない場合、該当テストはスキップして警告。
+- **保存方式**: `StorageBackend` の共通テストを 2 実装に対して実行（FolderBackend はメモリ上の偽ハンドル、LibraryBackend は Playwright 上の実 OPFS）。
+- **タイル分割**: 同じ画像を「一括」と「タイル分割」で現像した結果が許容誤差内で一致することを検証（境目の段差がないこと）。
+- **デコード（合成データ）**: JPEG / PNG は生成した画像で検証。RAW / HEIC は、ライセンス上再配布可能な公開サンプル（raw.pixls.us 等）を CI 時にダウンロードして寸法・向き・メタデータを検証する（ダウンロードできない場合はスキップ）。
+- **デコード（実機の写真）**: EOS 20D の CR2、D5300 の NEF、iPhone の HEIC / ProRAW は**現時点でサンプル未提供のため保留**。入手後に `test-assets/`（`.gitignore` 対象、コミットしない）に置けば自動で有効になるテストとして用意しておく。
 - **描画の回帰テスト**: 代表的なパラメータの組み合わせで出力を基準画像と比較（PSNR などの閾値）。
+- **レイアウト**: Playwright で PC 幅と iPhone 幅（WebKit エンジン）の画面を撮って確認。
+- **iPhone 実機確認**: 自動化できない項目（写真アプリからの取り込み形式、共有シート、メモリ、PWA）は手動確認のチェックリストを用意する。
 - **パフォーマンス計測**: プレビュー描画時間と RAW 読み込み時間を計測するベンチマークを用意し、目標（3.4）と比較。
 
 ## 9. 技術スタック
 
 - TypeScript（strict）、Svelte 5、Vite
 - WebGPU（WGSL コンピュートシェーダー）
-- LibRaw の WASM ビルド（既存の npm パッケージを評価し、要件——カメラ RGB 出力、行列・WB の取得——を満たさなければ自前ビルド）
-- libheif の WASM ビルド
+- LibRaw の WASM ビルド（既存の npm パッケージを評価し、要件——カメラ RGB 出力、行列・WB の取得、リニア DNG——を満たさなければ自前ビルド）
+- libheif の WASM ビルド（Safari 以外で使用）
+- libjxl の WASM ビルド（JPEG XL 圧縮の ProRAW 用。必要と判明した場合のみ）
 - MozJPEG の WASM ビルド
-- Vitest、Playwright
-- 静的ファイルとして配信（`vite build` の成果物をローカルで開く or 任意の静的ホスティング）。SharedArrayBuffer を使う場合に備え、COOP/COEP ヘッダーを付けられる配信方法にする。
+- Lucide（アイコン）
+- Vitest、Playwright（Chromium と WebKit）
+- PWA（Web App Manifest ＋ Service Worker。オフラインでも起動できるようアプリ本体をキャッシュ）
+
+### 9.1 無料での運用
+| 項目 | 方法 | 費用 |
+|---|---|---|
+| ライブラリ | すべてオープンソース（LibRaw: LGPL/CDDL、libheif: LGPL、libjxl: BSD、MozJPEG: BSD 系、Svelte/Vite/Lucide: MIT/ISC） | 無料 |
+| 公開 | Cloudflare Pages の無料プラン。`_headers` ファイルで COOP/COEP ヘッダーを付与（SharedArrayBuffer に必要）。HTTPS 自動 | 無料 |
+| URL | `<名前>.pages.dev` | 無料（独自ドメインは任意、年 1,500 円程度） |
+| iPhone での利用 | PWA としてホーム画面に追加。App Store は使わない | 無料（Apple の開発者登録は不要） |
+| サーバー・API | 使わない（すべて端末内で処理） | 無料 |
+| ソースコード管理・CI | GitHub の無料プランと GitHub Actions | 無料 |
+
+有料の選択肢が必要になった場合（例: 将来の AI 機能でクラウド API を使うか）は、実装前にユーザーと相談する。
 
 ## 10. 未確定のリスク
 
 - **LibRaw-WASM の選定**: 既存パッケージがカメラ RGB の出力や行列取得に対応していない場合、自前ビルド（Emscripten）が必要。実装計画の最初のタスクで検証する。
 - **RAW の色再現**: 単一の D65 行列による変換のため、Lightroom の DCP プロファイルとは色が一致しない。v1 では「破綻なく自然」を基準とし、完全一致は目標にしない。
 - **ハイライト／シャドウの品質**: ガイデッドフィルターのハロや計算量はパラメータ調整が必要。プレビューと書き出しで見た目が一致するよう、半径は画像サイズに比例させる。
+- **iPhone Safari の WebGPU**: iOS 26 で標準有効だが、コンピュートシェーダーの性能・`rgba16float` の対応・メモリ上限は実機で確認が必要。実装計画の初期に最小のパイプラインを iPhone 実機で動かして検証する。
+- **iPhone のメモリ**: 48MP の写真では、元データ（16bit RGB で約 290MB）、作業画像（4096px で約 100MB）、書き出し用タイルが同時に載る。これで落ちる可能性があるため、作業画像の上限とタイルの大きさは実機計測で調整する。元データを保持しきれない場合は、書き出し時に再デコードする方式に切り替える。
+- **写真アプリからの取り込み形式**: iOS がオリジナルではなく JPEG を渡す場合がある（2.4）。実機で確認し、案内の文言を決める。
+- **JPEG XL 圧縮の ProRAW**: LibRaw の対応状況を検証し、非対応なら libjxl を組み込む。
+- **ライブラリ方式のデータ消失**: OPFS のデータは端末内にしかなく、ブラウザのデータ削除で消える。PWA 化と永続化要求で軽減するが、完全には防げないことを UI で明示する。
