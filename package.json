@@ -11,7 +11,8 @@
     "test": "vitest run",
     "e2e": "playwright test",
     "samples": "NODE_USE_ENV_PROXY=1 node scripts/fetch-samples.ts",
-    "fixtures": "python3 tests/fixtures/make-fixtures.py"
+    "fixtures": "python3 tests/fixtures/make-fixtures.py",
+    "bench": "BENCH=1 playwright test tests/e2e/bench.spec.ts --trace off --reporter=line"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
@@ -23,6 +24,7 @@
     "svelte-check": "^4.7.8",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
+    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^5.1.0"
   },
   "dependencies": {
