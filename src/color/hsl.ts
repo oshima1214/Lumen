@@ -44,7 +44,7 @@ export function hslBandWeights(hueRad: number): Float32Array {
   return w;
 }
 
-const SKIN_COS = Math.cos(50 * DEG), SKIN_SIN = Math.sin(50 * DEG), SKIN_EDGE = Math.cos(25 * DEG);
+export const SKIN_COS = Math.cos(50 * DEG), SKIN_SIN = Math.sin(50 * DEG), SKIN_EDGE = Math.cos(25 * DEG);
 
 export function vibranceSaturation(lab: Vec3, v: number, s: number): Vec3 {
   const [L, a, b] = lab;

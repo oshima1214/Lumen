@@ -9,7 +9,8 @@
 //   wM = 1 − wS − wH                                （常に ≥ 0）、グローバルは重み 1
 //   fade = min(1, 3·max(L, 0))                      （黒付近では色を足さない）
 //   (a, b) += Σ w_k·(σcos, σsin)_k · 0.1 · fade     （σ = 1 で OKLab の彩度 0.1）
-//   L = max(0, L + Σ w_k·λ_k·0.1)
+//   L = L + Σ w_k·λ_k·0.1                          （下限で丸めない: 既定値で厳密に恒等にするため。負の L は
+//                                                   出力段のクリップで黒になる。計画 Task 13 の裁定）
 import { smoothstep } from './tone';
 import type { Vec3 } from './spaces';
 
@@ -35,5 +36,5 @@ export function applyGrading(lab: Vec3, g: Float32Array): Vec3 {
     db += w[k]! * g[k * 3 + 1]!;
     dL += w[k]! * g[k * 3 + 2]!;
   }
-  return [Math.max(0, L + dL * GRADING_LUM), a + da * GRADING_CHROMA * fade, b + db * GRADING_CHROMA * fade];
+  return [L + dL * GRADING_LUM, a + da * GRADING_CHROMA * fade, b + db * GRADING_CHROMA * fade];
 }

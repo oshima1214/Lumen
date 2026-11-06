@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Lumen GPU 検証</title>
+    <style>
+      :root { --bg: #1C1C1C; --panel: #252525; --line: #333333; --text: #E6E6E6; --text-sub: #9A9A9A; --accent: #D9A441; --danger: #E5484D; }
+      html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, system-ui, sans-serif; }
+      main { max-width: 720px; margin: 0 auto; padding: 16px; }
+      h1 { font-size: 18px; font-weight: 600; }
+      table { width: 100%; border-collapse: collapse; background: var(--panel); }
+      th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; font-variant-numeric: tabular-nums; }
+      th { color: var(--text-sub); font-weight: 400; width: 45%; }
+      .ok { color: var(--accent); } .ng { color: var(--danger); }
+      pre { white-space: pre-wrap; word-break: break-all; color: var(--text-sub); font-size: 12px; }
+      button { min-height: 44px; padding: 0 16px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Lumen GPU 検証</h1>
+      <p id="status">計測中…</p>
+      <table id="results"></table>
+      <p><button id="copy" type="button">結果をコピー</button></p>
+      <pre id="json"></pre>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
