@@ -83,3 +83,8 @@ Task 10: Ruling: camToXyz fallback chain cam_xyz → DNG ColorMatrix (D65-neares
 Task 10: Ruling: bayer DNG without embedded JPEG → extractRawPreview returns null (Task 11 preview falls back to downscaled decode) — cost: none
 Task 10: Ruling: JPEG XL compressed DNG unsupported by bundled LibRaw (placeholder only); added Task 10b to the plan, deferred until a sample exists — cost: iPhone 16 Pro+ JXL ProRAW cannot be opened in v1 (clear error)
 Task 10: complete (commits 05229c2..27b332b, tests: sh -c 'npx tsc -p . && npx vitest run && npx playwright test --trace off' →   15 passed (18.7s))
+Task 11: Ruling: e2e harness now writes its build to dist/__e2e/<name>/ (served by vite preview) instead of in-memory + page.route — requests from a worker spawned inside a worker (libraw-wasm) bypass page.route, so RAW decode inside the decode worker hung in tests only — cost: dist/ contains __e2e after running e2e; always deploy from a fresh `npm run build` (it empties dist)
+Task 11: Ruling: switched to libraw-wasm-nothread@1.6.0-nothread.1 (ISC, single-thread fork, same API) — no SharedArrayBuffer/pthread pool inside a nested worker, less memory on iPhone — cost: slower RAW demosaic on multi-core PCs
+Task 11: Ruling: added src/decode/decode-any.ts (format dispatch + DecodeError in worker) and src/decode/preview.ts (embedded JPEG → browser resize; RAW without JPEG → CPU develop with defaultParams via developPixel) — cost: none
+Task 11: Ruling: working image pixels are a copy when no downscale is needed so the full-res buffer stays in the worker (transfer would detach it) — cost: one extra copy for small images
+Task 11: complete (commits 27b332b..cdf9819, tests: sh -c 'npx tsc -p . && npx vitest run && npx playwright test --trace off' →   21 passed (17.5s))
