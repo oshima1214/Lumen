@@ -154,3 +154,27 @@ Task 21: Ruling: EXIF date written from local Date getters (inverse of exifr rev
 Task 21: complete (commits f07f08f..74032d8, tests: sh -c 'npx tsc -p . && npx vitest run && npx playwright test --trace off' →   44 passed (36.5s))
 Task 25: partial — src/ui/curve-edit.ts (addPoint/movePoint/removePoint, MAX_POINTS 16, GAP 0.01, points closer than 0.01 in x are not added) done with unit tests 7/7; CurveEditor/CropTool components wait for UI shell (track UI)
 Task 28: partial — PWA (vite-plugin-pwa MIT, icons self-drawn), pwa.spec 2/2, bench (BENCH=1 only; SwiftShader preview 1069 ms median, 24MP first draw 2446 ms), docs/iphone-checklist.md, README deploy steps; final full-suite run pending after UI merge. Ruling: bench spec skipped unless BENCH=1 to keep the suite fast — cost: none
+Task 22: complete (track UI, commit 4af4072, tests: shell.spec 7/7)
+Task 23: complete (track UI, commit 09aae3c, tests: vitest shortcuts 20, desktop.spec 10)
+Task 24: complete (track UI, commit 5082eb5, tests: vitest wb-panel 6, panels.spec 8; branch vitest 273, e2e 59)
+Merge track UI (package.json conflict: kept lucide-svelte + piexifjs): tsc clean, svelte-check 0/0, vitest 297, e2e 71 pass 2 skip
+Task 22: Ruling: useAppHarness(name) builds the app in mode 'test' from tests/e2e/harness/app.html into dist/__e2e/app-<spec>/ with a fake FolderBackend on window.__lumenTestBackend; production build strips the hook (tested) — cost: one vite build per spec
+Task 22: Ruling: test builds expose window.__lumenApp {app, editor, renderer, backend} — cost: none
+Task 22: Ruling: Shell takes {app: App} (App owns platform, backend, editor, renderer, shared canvas, thumbs; passed via context) — cost: small signature change vs plan
+Task 22: Ruling: createGpu failure → Unsupported screen with reason — cost: none
+Task 22: Ruling: mobile shell is a placeholder (top bar, settings, banner, add button, 7 inert tool tabs) until Task 27 — cost: no iPhone editing until Task 27
+Task 22: Ruling: StatusBanner shows saveError (sticky), corrupted/.bak, read-only, sourceChanged, notice, import messages; settings menu shows storage mode and persistence warning with red dot — cost: none
+Task 22: Ruling: --tap 44px on buttons; slider number button 24px inside a ~48px row — cost: Task 27 may enlarge on mobile
+Task 23: Ruling: `¥` also toggles before/after; Shift+R = crop; Ctrl+C/V/R/E without Shift and Ctrl+digit are not captured — cost: none
+Task 23: Ruling: Ctrl+Shift+C/V use DEFAULT_COPY_GROUPS directly (no dialog yet); R toggles app.tool; Ctrl+Shift+E bumps app.exportRequested — Task 25/26 must hook these — cost: rewiring run()
+Task 23: Ruling: lazy thumbnails via visibility; failed thumbs/decodes get data-error — cost: none
+Task 23: Ruling: filmstrip ratings only for images opened this session (app.ratings) — cost: unvisited images show no stars
+Task 23: Ruling: viewer canvas object-fit contain; ResizeObserver device-px viewport → setView; double-click toggles fit/100% around point; 100% pan moves cx/cy by drag px / full-res cropped size — cost: none
+Task 23: Ruling: left browser filters by group; arrow keys & shift-range within filtered list — cost: none
+Task 24: Ruling: Slider extra props range/get/set/resetTo/disabled and 'hue' track; hsl-<band> track shows h/s/l gradient by path suffix — cost: none
+Task 24: Ruling: relative drag (no jump), click without move records nothing, snap to step, full-width digit input, arrow keys stopPropagation — cost: no click-to-jump
+Task 24: Ruling: WB UI: RAW in K/tint (2000–50000, ±150) shown from asShotCctTint in asShot mode; display ±100; slider move → custom; returning to as-shot stores {asShot,0,0}; RAW without matrix falls back to 6500 K — cost: tint 0 ≠ D65 (Task 6)
+Task 24: Ruling: grading via per-region H/S/L sliders + swatch, no colour wheels — cost: later UI upgrade
+Task 24: Ruling: histogram refresh 120 ms after change + 2 rAF; end bins ignored for scale; clip boxes with % tooltip — cost: ~150 ms lag
+Task 24: Ruling: right panel 「すべてリセット」; tone curve/crop sections show 「準備中です」 until Task 25 — cost: none
+Tests: Ruling: harness.ts exports routeFiles() (refactor) — cost: none

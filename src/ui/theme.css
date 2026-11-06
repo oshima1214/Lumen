@@ -1,0 +1,63 @@
+/* 配色と基本の見た目（仕様 5.2）。トークンの値は仕様の表そのまま。ライトモードは作らない。 */
+:root {
+  --bg: #1C1C1C;
+  --panel: #252525;
+  --line: #333333;
+  --text: #E6E6E6;
+  --text-sub: #9A9A9A;
+  --accent: #D9A441;
+  --danger: #E5484D;
+  /* 写真周囲の背景（18% グレー） */
+  --gray18: #777777;
+  /* タップ領域の最小サイズ（計画 Global Constraints） */
+  --tap: 44px;
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--bg);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+#app { height: 100%; }
+
+button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  min-height: var(--tap);
+  min-width: var(--tap);
+  padding: 0 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+button:hover:not(:disabled) { background: var(--line); }
+button:disabled { color: var(--text-sub); cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #1C1C1C; }
+button.primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }
+button.icon { padding: 0; border-color: transparent; }
+button[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+
+input, select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.num { font-variant-numeric: tabular-nums; }
+.sub { color: var(--text-sub); }
+.danger { color: var(--danger); }

@@ -30,18 +30,23 @@ export function useHarness(entry: string, readyTitle: string): { open(page: Page
     async open(page: Page) {
       await page.route(`**${base}index.html`, (route) => route.fulfill({ headers: HEADERS, contentType: 'text/html',
         body: `<!doctype html><meta charset="utf-8"><title>loading</title><script type="module" src="${base}harness.js"></script>` }));
-      await page.route('**/__e2e/files/**', async (route) => {
-        const path = decodeURIComponent(new URL(route.request().url()).pathname.replace(/^\/__e2e\/files\//, ''));
-        const m = /^(\w+)\/(.+)$/.exec(path);
-        if (!m || !FILE_ROOTS[m[1]!] || m[2]!.includes('..')) return route.fulfill({ status: 404, body: 'not found' });
-        const p = resolve(FILE_ROOTS[m[1]!]!, m[2]!);
-        if (!existsSync(p)) return route.fulfill({ status: 404, body: 'not found' });
-        return route.fulfill({ headers: HEADERS, contentType: 'application/octet-stream', body: readFileSync(p) });
-      });
+      await routeFiles(page);
       await page.goto(`${base}index.html`);
       await expect(page).toHaveTitle(readyTitle);
     },
   };
+}
+
+/** /__e2e/files/** を tests/fixtures・.samples・test-assets から配信する */
+export async function routeFiles(page: Page): Promise<void> {
+  await page.route('**/__e2e/files/**', async (route) => {
+    const path = decodeURIComponent(new URL(route.request().url()).pathname.replace(/^\/__e2e\/files\//, ''));
+    const m = /^(\w+)\/(.+)$/.exec(path);
+    if (!m || !FILE_ROOTS[m[1]!] || m[2]!.includes('..')) return route.fulfill({ status: 404, body: 'not found' });
+    const p = resolve(FILE_ROOTS[m[1]!]!, m[2]!);
+    if (!existsSync(p)) return route.fulfill({ status: 404, body: 'not found' });
+    return route.fulfill({ headers: HEADERS, contentType: 'application/octet-stream', body: readFileSync(p) });
+  });
 }
 
 /** /__e2e/files/... を Blob として取得する（ページ内で使うコード片） */

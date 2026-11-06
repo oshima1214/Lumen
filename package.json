@@ -34,6 +34,7 @@
     "idb": "^8.0.4",
     "libheif-js": "^1.23.5",
     "libraw-wasm-nothread": "^1.6.0-nothread.1",
+    "lucide-svelte": "^1.0.1",
     "piexifjs": "^1.0.6"
   }
 }
