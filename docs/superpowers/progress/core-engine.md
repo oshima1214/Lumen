@@ -112,3 +112,12 @@ Tests(engine): Ruling: tests/e2e/harness/serve.ts + engine-harness.ts (in-memory
 Resume: scheduled self-message 2026-11-06 14:50 JST (trigger trig_01AdqemEqe4gAkwbFZR4fAE7) — next: merge feat/track-engine, then Task 15 (and Task 18 thumbs), Task 13 Step 7 user checkpoint pending
 Resume 2026-11-06 14:50 JST: merged feat/track-engine into feat/core-engine — tsc clean, vitest 193/193, e2e 32 pass 1 skip
 Parallel(resume): Ruling: subagent track S does Task 18 + 19 (branch feat/track-store); I do Task 15, 20, 21. GpuOutOfMemoryError pre-committed in src/engine/errors.ts (renderer.ts re-exports) so Task 19 compiles without Task 15 — cost: none
+Task 15: Ruling: crop frame = rotated frame about oriented-image centre; angle>0 rotates the image clockwise on screen; aspect '3:2' etc follow image orientation (landscape → wide) — cost: sign flip if UI expects opposite
+Task 15: Ruling: Renderer.setImage is async (popErrorScope) and rejects GpuOutOfMemoryError (dims > maxTextureDimension2D or OOM scope); told track S — cost: none
+Task 15: Ruling: ViewState gains `viewport {w,h}` (device px); fit mode sizes the canvas to the cropped aspect capped at previewCap; '100' mode = 1 full-res px per device px; `background` is UI-only; `before` = defaultParams with current crop — cost: none
+Task 15: Ruling: Renderer adds renderNow() (awaits GPU), snapshot() (RGBA8 readback for tests), whenReady() (device-loss recovery; recreateGpu option) — cost: none
+Task 15: Ruling: canvas configured rgba8unorm (copyTextureToTexture from the rgba8 storage output); colorSpace display-p3 when outSpace 'p3' — cost: none
+Task 15: Ruling: headless SwiftShader loses the device on WebGPU canvas getCurrentTexture unless Chromium gets `--use-vulkan=swiftshader --enable-unsafe-swiftshader`; added to playwright.config.ts + README — cost: none (test env only)
+Task 15: Ruling: develop.wgsl dither skipped for pixels at 0 or 1 (clipped) so histogram clip counts are exact — found by histogram test (RED 1022/1024 → GREEN) — cost: none
+Task 15: Ruling: renderTileFull is NOT added here; Task 20 adds it with its own tests — cost: none
+Task 15: complete (commits 77ad82c..46b8583, tests: sh -c 'npx tsc -p . && npx vitest run && npx playwright test --trace off' →   37 passed (29.6s))
