@@ -98,6 +98,27 @@ function unorient(o: Orientation, OW: number, OH: number): M3 {
 }
 
 /**
+ * 切り抜き後の画像（原寸、フレーム座標の画素。幅 crop.w·OW × 高さ crop.h·OH、端数を丸めない）→ 入力 UV の行列（行優先 9 要素）。
+ * 書き出しのタイル計画（export/tiles.ts）とプレビューの両方がこれを使う。
+ */
+export function frameMatrix(src: { w: number; h: number; o: Orientation }, crop: Crop): number[] {
+  const { w: OW, h: OH } = orientedSize(src.w, src.h, src.o);
+  const t = (crop.angle * Math.PI) / 180, co = Math.cos(t), si = Math.sin(t);
+  const rotInv: M3 = [co, si, 0, -si, co, 0, 0, 0, 1];          // Rot(−angle)
+  let m = translate(crop.x * OW, crop.y * OH);                    // → 回転フレーム上の向き補正後 px
+  m = mul(translate(-OW / 2, -OH / 2), m);
+  m = mul(rotInv, m);
+  m = mul(translate(OW / 2, OH / 2), m);                          // → 向き補正後 px
+  m = mul(unorient(src.o, OW, OH), m);                            // → 保存画素 px
+  return mul(scale(1 / src.w, 1 / src.h), m);                     // → UV
+}
+
+/** 3x3 行列（行優先 9 要素）の積 a·b */
+export function matMul(a: readonly number[], b: readonly number[]): number[] { return mul(a as M3, b as M3); }
+export const matTranslate = (x: number, y: number): number[] => translate(x, y);
+export const matScale = (x: number, y: number): number[] => scale(x, y);
+
+/**
  * 出力画素（中心の絶対座標）→ 入力 UV の変換。
  * src: 保存画素の寸法と向き。out: 出力の寸法。切り抜き後の画像を out に「収まるように」縮小・中央寄せする。
  * view: zoom（1 = 収まる大きさ）と、表示中心（切り抜き後の画像上の正規化座標）。
@@ -108,15 +129,8 @@ export function sampleTransform(src: { w: number; h: number; o: Orientation }, c
   const CW = crop.w * OW, CH = crop.h * OH;
   const k = Math.min(out.w / CW, out.h / CH) * (view?.zoom ?? 1);
   const cx = (view?.cx ?? 0.5) * CW, cy = (view?.cy ?? 0.5) * CH;
-  const t = (crop.angle * Math.PI) / 180, co = Math.cos(t), si = Math.sin(t);
-  const rotInv: M3 = [co, si, 0, -si, co, 0, 0, 0, 1];          // Rot(−angle)
   let m = translate(-out.w / 2, -out.h / 2);                       // 出力中心を原点へ
   m = mul(scale(1 / k, 1 / k), m);                                 // 出力 px → 切り抜き後の px
-  m = mul(translate(cx + crop.x * OW, cy + crop.y * OH), m);       // → 回転フレーム上の向き補正後 px
-  m = mul(translate(-OW / 2, -OH / 2), m);
-  m = mul(rotInv, m);
-  m = mul(translate(OW / 2, OH / 2), m);                           // → 向き補正後 px
-  m = mul(unorient(src.o, OW, OH), m);                             // → 保存画素 px
-  m = mul(scale(1 / src.w, 1 / src.h), m);                         // → UV
-  return { m: new Float32Array(m) };
+  m = mul(translate(cx, cy), m);                                   // → フレーム px
+  return { m: new Float32Array(mul(frameMatrix(src, crop) as M3, m)) };
 }

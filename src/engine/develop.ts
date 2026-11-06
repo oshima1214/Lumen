@@ -59,7 +59,7 @@ export function isIdentityLut(lut: Float32Array): boolean {
   return true;
 }
 
-const PASS_BYTES = 80;
+const PASS_BYTES = 96;
 
 export class DevelopPass {
   private readonly device: GPUDevice;
@@ -100,10 +100,11 @@ export class DevelopPass {
   /**
    * src の srcMip 段を読み、out（STORAGE_BINDING、DevelopOutFormat）の outRect 内の画素だけを書く。
    * u は packUniforms の結果。sample は出力画素（out 上の絶対座標）→ 入力 UV（geometry.ts）。
-   * base は r32float のベース層（入力画像全体を覆う。処理段 4 が既定値なら読まない）。
+   * base は r32float のベース層（画像全体を覆う。処理段 4 が既定値なら読まない）。
+   * baseMap: src が画像の一部（タイル）のとき、src の UV → ベース層の UV（uv * xy + zw）。
    */
   run(src: GPUTexture, srcMip: number, base: GPUTexture, u: Float32Array, out: GPUTexture, outRect: Rect,
-    sample: SampleTransform): void {
+    sample: SampleTransform, baseMap: readonly [number, number, number, number] = [1, 1, 0, 0]): void {
     if (u.length !== UNIFORM_FLOATS) throw new Error(`uniform は ${UNIFORM_FLOATS} floats（${u.length}）`);
     const format = out.format as DevelopOutFormat;
     const pipeline = this.pipeline(format);
@@ -117,6 +118,7 @@ export class DevelopPass {
     const m = sample.m;
     for (let r = 0; r < 3; r++) fl.set([m[r * 3]!, m[r * 3 + 1]!, m[r * 3 + 2]!, 0], r * 4);
     new Uint32Array(pass, 48, 8).set([outRect.x, outRect.y, outRect.w, outRect.h, srcMip, this.lutMask, hslOn, gradingOn]);
+    new Float32Array(pass, 80, 4).set(baseMap);
     const passBuf = device.createBuffer({ label: 'develop-pass', size: PASS_BYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     device.queue.writeBuffer(passBuf, 0, pass);
 

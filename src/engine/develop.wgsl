@@ -13,6 +13,7 @@ struct Pass {
   m2: vec4<f32>,
   rect: vec4<u32>,            // outRect x, y, w, h
   flags: vec4<u32>,           // srcMip, lutMask（bit: tone, rgb, r, g, b。1 = 適用）, hslOn, gradingOn
+  bmap: vec4<f32>,            // ベース層の UV = uv * bmap.xy + bmap.zw（タイル書き出しで src が画像の一部のとき）
 }
 
 @group(0) @binding(0) var<uniform> P: Params;
@@ -177,7 +178,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   var rgb = linearStages(rgbIn);
   // 4
   if (P.tone1.w != 0.0 || P.tone2.x != 0.0) {
-    rgb *= localToneGain(bilinear(base, 0u, uv).x, P.tone1.w, P.tone2.x);
+    rgb *= localToneGain(bilinear(base, 0u, uv * S.bmap.xy + S.bmap.zw).x, P.tone1.w, P.tone2.x);
   }
   // 5
   if (any(P.tone1.xyz != vec3<f32>(0.0))) {

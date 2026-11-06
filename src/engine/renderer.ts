@@ -7,9 +7,10 @@ import type { WorkingImage } from '../decode/types';
 import { DevelopPass } from './develop';
 import { GpuOutOfMemoryError } from './errors';
 import { createGpu, type Gpu } from './gpu';
-import { orientedSize, sampleTransform } from './geometry';
+import { frameMatrix, matMul, matScale, matTranslate, orientedSize, sampleTransform } from './geometry';
 import { LocalTonePass } from './localtone';
-import { uploadRgb16, type GpuImage } from './upload';
+import { readTexture, uploadRgb16, type GpuImage } from './upload';
+import type { Rect } from './develop';
 import histogramSrc from './histogram.wgsl?raw';
 
 export { GpuOutOfMemoryError };
@@ -161,12 +162,7 @@ export class Renderer {
     const packed = packUniforms(u);
     this.develop.setLuts(luts);
     // ハイライト／シャドウを使うときだけベース層を作る（WB・露光が変わったら作り直す。Task 14 の判断）
-    let base = this.dummyBase;
-    if (p.basic.highlights !== 0 || p.basic.shadows !== 0) {
-      const key = JSON.stringify([p.wb, p.basic.exposure]);
-      if (key !== this.baseKey || !this.base) { this.base = this.localTone.build(g, packed); this.baseKey = key; }
-      base = this.base;
-    }
+    const base = this.baseFor(p, g, packed);
     const view2 = view.mode === '100' ? { zoom: size.zoom, cx: view.cx, cy: view.cy } : undefined;
     const sample = sampleTransform({ w: img.width, h: img.height, o: img.orientation }, p.crop, { w: size.w, h: size.h }, view2);
     // 作業画像の何画素が出力 1 画素に当たるかでミップ段を選ぶ
@@ -177,6 +173,46 @@ export class Renderer {
     const enc = device.createCommandEncoder({ label: 'present' });
     enc.copyTextureToTexture({ texture: this.out }, { texture: this.ctx.getCurrentTexture() }, { width: size.w, height: size.h });
     device.queue.submit([enc.finish()]);
+  }
+
+  /** ハイライト／シャドウを使うときだけ作業画像全体からベース層を作る（WB・露光が変わったら作り直す。Task 14） */
+  private baseFor(p: DevelopParams, g: GpuImage, packed: Float32Array): GPUTexture {
+    if (p.basic.highlights === 0 && p.basic.shadows === 0) return this.dummyBase;
+    const key = JSON.stringify([p.wb, p.basic.exposure]);
+    if (key !== this.baseKey || !this.base) { this.base = this.localTone.build(g, packed); this.baseKey = key; }
+    return this.base;
+  }
+
+  /**
+   * 書き出し用: 原寸のフレーム範囲 frame（切り抜き後画像の画素座標）を現像して RGBA float（出力の符号化済み値 0..1、
+   * ディザなし）で返す。tile は frame の描画に要る元データ（保存画素の rect 範囲）。ベース層は作業画像全体から作った
+   * ものを共有するので、タイルの境目で明るさが変わらない（仕様 3.4）。
+   */
+  async renderTileFull(p: DevelopParams, tile: { data: Uint16Array; rect: Rect }, frame: Rect, out: OutputSpace): Promise<Float32Array> {
+    await this.ready;
+    const img = this.img, g = this.gimg;
+    if (!img || !g) throw new Error('画像が設定されていません');
+    const { device } = this.gpu;
+    const W = img.fullWidth, H = img.fullHeight, r = tile.rect;
+    const { u, luts } = buildUniforms(p, img, out);
+    const packed = packUniforms(u);
+    this.develop.setLuts(luts);
+    const base = this.baseFor(p, g, packed);
+    const src = uploadRgb16(this.gpu, tile.data, r.w, r.h);
+    const dst = device.createTexture({ label: 'tile-out', size: { width: frame.w, height: frame.h }, format: 'rgba32float',
+      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC });
+    try {
+      let m = matTranslate(frame.x, frame.y);                                  // 出力テクセル → フレーム px
+      m = matMul(frameMatrix({ w: W, h: H, o: img.orientation }, p.crop), m); // → 画像全体の UV
+      m = matMul(matScale(W, H), m);                                          // → 保存画素 px
+      m = matMul(matTranslate(-r.x, -r.y), m);
+      m = matMul(matScale(1 / r.w, 1 / r.h), m);                              // → タイルの UV
+      this.develop.run(src.texture, 0, base, packed, dst, { x: 0, y: 0, w: frame.w, h: frame.h }, { m: new Float32Array(m) },
+        [r.w / W, r.h / H, r.x / W, r.y / H]);
+      return await readTexture(this.gpu, dst);
+    } finally {
+      src.destroy(); dst.destroy();
+    }
   }
 
   /** 最後に描いた出力のヒストグラム */
