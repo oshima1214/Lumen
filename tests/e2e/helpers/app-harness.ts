@@ -16,6 +16,8 @@ export interface AppQuery {
   set?: 'basic' | 'broken';
   /** 'prompt' でフォルダ権限の失効（再起動後）を模擬する */
   perm?: 'granted' | 'prompt';
+  /** 'library' で実 OPFS の LibraryBackend（iPhone と同じ保存方式）を使う */
+  backend?: 'folder' | 'library';
 }
 
 export function useAppHarness(name: string): { open(page: Page, q?: AppQuery): Promise<void> } {
@@ -36,7 +38,7 @@ export function useAppHarness(name: string): { open(page: Page, q?: AppQuery): P
   return {
     async open(page: Page, q: AppQuery = {}) {
       await routeFiles(page);
-      const qs = new URLSearchParams({ set: q.set ?? 'basic', perm: q.perm ?? 'granted' });
+      const qs = new URLSearchParams({ set: q.set ?? 'basic', perm: q.perm ?? 'granted', backend: q.backend ?? 'folder' });
       await page.goto(`${base}${ENTRY}?${qs}`);
       await page.waitForFunction(() => !!(window as unknown as { __lumenApp?: unknown }).__lumenApp);
     },
