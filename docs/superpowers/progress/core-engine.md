@@ -88,3 +88,25 @@ Task 11: Ruling: switched to libraw-wasm-nothread@1.6.0-nothread.1 (ISC, single-
 Task 11: Ruling: added src/decode/decode-any.ts (format dispatch + DecodeError in worker) and src/decode/preview.ts (embedded JPEG → browser resize; RAW without JPEG → CPU develop with defaultParams via developPixel) — cost: none
 Task 11: Ruling: working image pixels are a copy when no downscale is needed so the full-res buffer stays in the worker (transfer would detach it) — cost: one extra copy for small images
 Task 11: complete (commits 27b332b..cdf9819, tests: sh -c 'npx tsc -p . && npx vitest run && npx playwright test --trace off' →   21 passed (17.5s))
+## Track engine (branch feat/track-engine, NOT YET MERGED into feat/core-engine)
+Task 12: complete (track engine, commit e45cd31, tests: gpu-upload.spec 5/5)
+Task 13: complete except Step 7 user checkpoint (track engine, commit 582e144, tests: develop-parity 85 cases worst 0.011/512, gpu-check.spec)
+Task 14: complete (track engine, commit 28cfa17, tests: baselayer 4/4, localtone.spec 2/2; track total vitest 176, e2e 17)
+Track engine fix: commit 1416a7d applyGrading clamped OKLab L>=0 even at defaults (changed out-of-gamut RAW pixels) — removed clamp in TS+WGSL, tests/unit/grading.test.ts RED→GREEN
+Task 12: Ruling: upload in row batches ≤ min(64 MiB, maxStorageBufferBindingSize); uploadRgb16 optional {chunkBytes} for tests — cost: none
+Task 12: Ruling: mips are plain 2x2 average, odd last row/col dropped — cost: slight edge bias at small mips
+Task 12: Ruling: createGpu requests adapter max for maxTextureDimension2D/maxBufferSize/maxStorageBufferBindingSize/maxComputeWorkgroupStorageSize; throws Error('WebGPU を初期化できません') with cause — cost: none
+Task 12: Ruling: readTexture returns as many channels as the format has — cost: none
+Task 13: Ruling: SampleTransform maps absolute out-texel centre (x+.5,y+.5) → input UV (whole image, pre-orientation/crop) with projective divide; outRect only limits writes — cost: Task 15/20 compose translation
+Task 13: Ruling: manual bilinear (4 textureLoad) for source and base layer, deterministic across GPUs — cost: ~3 loads/pixel
+Task 13: Ruling: GPU atan2/sin/cos in HSL replaced by series approximations (built-ins were off 0.67/512) — cost: few FMAs
+Task 13: Ruling: shader constants generated from TS values at build; SKIN_COS/SIN/EDGE exported from hsl.ts — cost: none
+Task 13: Ruling: default-valued stages skipped via uniform branches and identity-LUT mask — cost: none
+Task 13: Ruling: output formats rgba8unorm/rgba16float/rgba32float; only rgba8unorm adds ±1/255 triangular hash dither; parity on rgba32float; bgra8unorm canvas left to Task 15 — cost: Task 15 may need blit
+Task 13: Ruling: gpu-check HTML moved to dist/gpu-check/index.html in generateBundle hook; page accepts ?size=N; SwiftShader ~1092 ms per 2048² (software, not indicative of iPhone) — cost: re-check hook on Vite changes
+Task 14: Ruling: base layer r32float (core WebGPU lacks r16float storage write) — cost: none
+Task 14: Ruling: self-guided filter on log2(max(Y,2^-20)) after stages 1–3, eps 0.01, r=max(1,round(0.02·long edge)), clamped box windows, base long edge 512 (or image size), source = smallest mip ≥512 resampled — cost: look retune
+Task 14: Ruling: base layer depends on WB/exposure → LocalTonePass.build must rerun when they change (reuses texture) — cost: Task 15 Renderer must rebuild on WB/exposure change
+Task 14: Ruling: stages 1–3 factored to linearStages (TS) and common.wgsl — cost: none
+Tests(engine): Ruling: tests/e2e/harness/serve.ts + engine-harness.ts (in-memory route approach) — NOTE on merge: my Task 11 ruling moved tests/e2e/helpers/harness.ts to dist/__e2e; engine's serve.ts still uses page.route, fine unless nested workers needed — cost: two harness helpers to unify later
+Resume: scheduled self-message 2026-11-06 14:50 JST (trigger trig_01AdqemEqe4gAkwbFZR4fAE7) — next: merge feat/track-engine, then Task 15 (and Task 18 thumbs), Task 13 Step 7 user checkpoint pending
