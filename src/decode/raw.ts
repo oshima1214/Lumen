@@ -1,7 +1,7 @@
-// RAW / DNG（ProRAW を含む）のデコード。libraw-wasm（ISC、LibRaw は LGPL/CDDL）を使う。
+// RAW / DNG（ProRAW を含む）のデコード。libraw-wasm-nothread（ISC、libraw-wasm のシングルスレッド版、LibRaw は LGPL/CDDL）を使う。
 // 選定理由と設定の根拠: docs/decisions/libraw-wasm.md
 // 出力はカメラ RGB リニア（WB 倍率 1、自動明るさなし、ガンマ 1、16bit）で、白レベルが 65535 になる。
-import LibRaw from 'libraw-wasm';
+import LibRaw from 'libraw-wasm-nothread';
 import { inv3, mul3, SRGB_TO_XYZ, type Mat3, type Vec3 } from '../color/spaces';
 import type { DecodedImage, ExifSummary, Orientation } from './types';
 
