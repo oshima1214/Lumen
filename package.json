@@ -9,7 +9,9 @@
     "preview": "vite preview --port 4173 --strictPort",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "samples": "NODE_USE_ENV_PROXY=1 node scripts/fetch-samples.ts",
+    "fixtures": "python3 tests/fixtures/make-fixtures.py"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
