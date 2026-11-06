@@ -201,7 +201,7 @@ Task 26: Ruling: progress bar role=progressbar + n/N; cancel finishes current im
 Task 26: Ruling: PC shortcuts ignored while a dialog[open] exists — cost: none
 Task 26: Ruling: モノクロ test tolerates ±1 between channels (per-channel dither) — cost: none
 Task 26: Ruling: playwright.config passes LANG=C.UTF-8 to Chromium (headless renamed Japanese download names) — cost: none
-Task 27: complete (commits 5c? see git log 'feat(ui): iPhone 画面', tests: vitest gestures 5/5, mobile.spec 5/5)
+Task 27: complete (commit f5c3754, tests: vitest gestures 5/5, mobile.spec 5/5)
 Task 27: Ruling: mobile = grid screen first (tap → editor), tool tabs only in the editor screen; Task 22 shell tests now assert data-testid mobile-shell instead of tool-tabs at 390px — cost: none
 Task 27: Ruling: pinch-zoom/pan are CSS transforms on the preview canvas (Renderer only has fit/100%); zoom resets on image change and when released at ≤1.01× — cost: zoomed preview is soft (preview resolution, max 2048 px on iPhone)
 Task 27: Ruling: GestureRecognizer has setZoomed(); swipe only when not zoomed and within 500 ms; long press 350 ms (10 px tolerance) → view.before — cost: none
@@ -210,3 +210,5 @@ Task 27: Ruling: mobile presets tab lists built-in + user presets and applies th
 Task 27: Ruling: grid long-press (500 ms) enters multi-select with paste / share / delete (library only, confirm) — cost: none
 Task 27: Ruling: app harness gains backend=library (real OPFS LibraryBackend, share stub window.__shared); swipe e2e uses one fast move (SwiftShader page is slow) — cost: none
 Merge track dialogs: conflicts in app.svelte.ts / DesktopLayout.svelte / app-harness.ts resolved keeping both sides (crop enter/commit + copy dialog/paste); vitest 309, e2e 86 pass 2 skip after shell test update
+Task 28: complete (commits 19f181c..9ced28c, tests: sh -c 'npx tsc -p . && npx svelte-check --tsconfig ./tsconfig.json --threshold error && npx vitest run && npx playwright test --trace off && rm -rf dist && npm run build' →   dist/workbox-2fbc6a65.js)
+PAUSE (user request): Tasks 1–28 done except 10b (deferred, needs JXL ProRAW sample) and Task 13 Step 7 user checkpoint. Next on resume: final whole-branch review (executing-plans Final Review) → fix pass → finishing-a-development-branch. Deferred known gaps: iPhone multi-image share opens one sheet per file; iPhone has no export-settings UI / preset create-import; pinch zoom is CSS-scaled preview.
