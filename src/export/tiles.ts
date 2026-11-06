@@ -18,14 +18,15 @@ export interface TilePlan {
 }
 
 export function planTiles(full: { w: number; h: number; o: Orientation }, crop: DevelopParams['crop'],
-  outLongEdge: number | null, opts: { tile?: number; overlap?: number } = {}): { outW: number; outH: number; scale: number; tiles: TilePlan[] } {
+  outLongEdge: number | null, opts: { tile?: number; overlap?: number; outMargin?: number } = {}): { outW: number; outH: number; scale: number; sx: number; sy: number; tiles: TilePlan[] } {
   const tile = opts.tile ?? TILE, overlap = opts.overlap ?? OVERLAP;
   const O = orientedSize(full.w, full.h, full.o);
   const CW = crop.w * O.w, CH = crop.h * O.h;
   const s = outLongEdge ? Math.min(1, outLongEdge / Math.max(CW, CH)) : 1;
   const outW = Math.max(1, Math.round(CW * s)), outH = Math.max(1, Math.round(CH * s));
   const sx = CW / outW, sy = CH / outH;                     // 出力 1px あたりのフレーム px
-  const m = Math.max(overlap, Math.ceil(3 * Math.max(sx, sy)) + 2);   // Lanczos-3 の支持幅＋余裕
+  // Lanczos-3 の支持幅＋余裕、さらに出力側のシャープ用の余白 outMargin（出力 px）をフレーム px に換算して足す
+  const m = Math.max(overlap, Math.ceil(3 * Math.max(sx, sy)) + 2 + Math.ceil((opts.outMargin ?? 0) * Math.max(sx, sy)));
   const coreW = Math.max(1, Math.floor((tile - 2 * m) / sx)), coreH = Math.max(1, Math.floor((tile - 2 * m) / sy));
   const fm = frameMatrix(full, crop);
   const toStored = (x: number, y: number): [number, number] => {
@@ -43,5 +44,5 @@ export function planTiles(full: { w: number; h: number; o: Orientation }, crop: 
     const maxX = Math.ceil(Math.max(...pts.map((q) => q[0]))) + 2, maxY = Math.ceil(Math.max(...pts.map((q) => q[1]))) + 2;
     tiles.push({ frame, core, src: { x: minX, y: minY, w: maxX - minX, h: maxY - minY } });
   }
-  return { outW, outH, scale: 1 / Math.max(sx, sy), tiles };
+  return { outW, outH, scale: 1 / Math.max(sx, sy), sx, sy, tiles };
 }
