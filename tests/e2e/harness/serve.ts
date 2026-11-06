@@ -34,7 +34,7 @@ export async function bundleHarness(entry: string): Promise<HarnessFiles> {
 
 export async function openHarness(page: Page, files: HarnessFiles, readyTitle: string): Promise<void> {
   const headers = { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' };
-  page.on('console', (m) => { if (m.type() === 'error') console.log(`[page] ${m.text()}`); });
+  page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.log(`[page] ${m.text()}`); });
   await page.route('**/__e2e/**', async (route) => {
     const path = new URL(route.request().url()).pathname.replace(/^\/__e2e\//, '');
     if (path === '' || path === 'index.html') {
