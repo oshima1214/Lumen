@@ -10,6 +10,7 @@
   import StatusBanner from '../StatusBanner.svelte';
   import Browser from './Browser.svelte';
   import Filmstrip from './Filmstrip.svelte';
+  import RightPanel from './RightPanel.svelte';
   import Viewer from './Viewer.svelte';
 
   const app = useApp();
@@ -64,7 +65,7 @@
   <div class="banner"><StatusBanner /></div>
   <aside class="left"><Browser /></aside>
   <main class="center"><Viewer /></main>
-  <aside class="right" data-testid="right-panel" aria-label="調整パネル"></aside>
+  <aside class="right" data-testid="right-panel" aria-label="調整パネル"><RightPanel /></aside>
   <footer class="film"><Filmstrip /></footer>
 </div>
 
