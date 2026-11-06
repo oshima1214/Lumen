@@ -24,3 +24,10 @@ o.save(out / 'orient6.jpg', quality=95, subsampling=0, exif=exif)
 p = Image.linear_gradient('L').resize((9000, 1000)).convert('RGB')
 p.save(out / 'pano9000.jpg', quality=85)
 print('ok')
+# HEIC（pillow-heif がある場合のみ）: libheif 経路の検証用
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+    Image.new('RGB', (64, 48), (128, 128, 128)).save(out / 'gray128.heic', quality=95)
+except ImportError:
+    print('pillow-heif が無いので gray128.heic はスキップ')
