@@ -110,3 +110,5 @@ Task 14: Ruling: base layer depends on WB/exposure → LocalTonePass.build must 
 Task 14: Ruling: stages 1–3 factored to linearStages (TS) and common.wgsl — cost: none
 Tests(engine): Ruling: tests/e2e/harness/serve.ts + engine-harness.ts (in-memory route approach) — NOTE on merge: my Task 11 ruling moved tests/e2e/helpers/harness.ts to dist/__e2e; engine's serve.ts still uses page.route, fine unless nested workers needed — cost: two harness helpers to unify later
 Resume: scheduled self-message 2026-11-06 14:50 JST (trigger trig_01AdqemEqe4gAkwbFZR4fAE7) — next: merge feat/track-engine, then Task 15 (and Task 18 thumbs), Task 13 Step 7 user checkpoint pending
+Resume 2026-11-06 14:50 JST: merged feat/track-engine into feat/core-engine — tsc clean, vitest 193/193, e2e 32 pass 1 skip
+Parallel(resume): Ruling: subagent track S does Task 18 + 19 (branch feat/track-store); I do Task 15, 20, 21. GpuOutOfMemoryError pre-committed in src/engine/errors.ts (renderer.ts re-exports) so Task 19 compiles without Task 15 — cost: none
