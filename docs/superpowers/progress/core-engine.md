@@ -24,3 +24,46 @@ Task 1: complete (commits 72ee045..9af56e8, tests: sh -c 'npx vitest run && npx 
 Parallel: Ruling: run track A (Tasks 2-7, subagent, branch feat/track-a) and track C (Tasks 16-17, subagent, branch feat/track-c) in parallel with me on track B (Tasks 8-11) — user approved — cost: merge work
 Parallel: Ruling: shared types (DevelopParams, DeepPartial, SourceInfo, Preset, HSL_BANDS) committed up front in src/params/types.ts; sidecar.ts/presets.ts/partial.ts re-export them instead of defining — lets C compile against Preset/SourceInfo without A's branch — cost: none
 Parallel: Ruling: Task 18 (thumb cache) moves from track C to me after Task 11 — it consumes Decoder.preview from track B — cost: none
+Task 2: complete (track A, commit 72c5f6a, tests: vitest platform → 6 pass)
+Task 3: complete (track A, commit aa13add, tests: vitest params-defaults → 7 pass)
+Task 4: complete (track A, commit 410f732, tests: vitest sidecar → 12 pass)
+Task 5: complete (track A, commit a89866f, tests: vitest partial+presets → 16 pass)
+Task 6: complete (track A, commit c74a87b, tests: vitest color-spaces+wb+oklab → 21 pass)
+Task 7: complete (track A, commit 3a73326, tests: vitest spline+tone+hsl+pipeline → 31 pass)
+Task 16: complete (track C, commit b412a3f, tests: vitest names+folder → 45 pass)
+Task 17: complete (track C, commit f861eba, tests: vitest 78 pass; e2e library.spec → 5 pass)
+Merge A+C into feat/core-engine: tsc clean, vitest 171/171, e2e 6/6
+Task 1(fix): Ruling: process typed both by `declare const process` (A) and @types/node (C); both kept, harmless — cost: none
+Task 2: Ruling: iOS = UA iPhone/iPad/iPod or Macintosh+maxTouchPoints>1; no WebGPU checked first — cost: one regex
+Task 3: Ruling: clampParams clamps wb.temp to [-100,50000], tint ±150 (keeps 0 sentinel and display ±100); clampWb(wb, kind) does type-aware clamp; RANGES adds wb.tempRel/tintRel — cost: callers must use clampWb when kind known
+Task 3: Ruling: clampParams also sanitizes NaN, sorts/clamps curve points and splits, resets unknown aspect/mode — cost: none
+Task 4: Ruling: deepMerge follows base shape, ignores unknown/mistyped keys, arrays replaced whole — cost: none
+Task 4: Ruling: fromSidecar: schema must be int>=1; older schema without migration throws; newer → readOnly best effort; rating clamped 0..5; bad source → null; sourceChanged compares size+mtime only — cost: small
+Task 5: Ruling: pickGroups copies whole groups including default values (paste resets to source) — cost: pasted defaults
+Task 5: Ruling: pruneToShape added; preset file format {app:'lumen',type:'preset',schema:1,name,params}; foreign app rejected; builtin never read; built-in values chosen by implementer (モノクロ = saturation −100) — cost: tune values
+Task 6: Ruling: plan test "cctTintToXy(6504,0)≈D65" contradicts Kim Planck locus (D65 is Duv +0.0032 off locus); kept formula, tested D65 round trip (≈6504K, tint≈+32) instead — cost: one-constant offset if tint 0 should equal D65
+Task 6: Ruling: tint sign: positive tint = illuminant green side (Duv+) → image toward magenta (matches spec slider green→magenta and Lightroom), overriding plan's "正 = Duv 負" — cost: flip TINT_DUV sign
+Task 6: Ruling: OKLab M1 composed with REC2020_TO_XYZ and row-normalized so white → a=b=0 exactly — cost: none
+Task 7: Ruling: Uniforms pre-scaled for shader; kind 1=raw 0=display; UNIFORM_FLOATS=104 (416 B); offsets in src/color/uniforms.ts header — cost: re-pack
+Task 7: Ruling: RAW wbMul normalized min=1, clip at 1; camToWork composed incl. Bradford illuminant→D65; custom WB only when temp>0; highlight desat smoothstep(0.8,1,min) — cost: highlight look
+Task 7: Ruling: stages 4/5 are luminance gains in log2; highlights only for base ≥0.09 (pixels <0.05 exactly unchanged) — cost: retune
+Task 7: Ruling: curves applied per channel on sRGB-OETF-encoded Rec.2020 with slope-1 extension outside 0..1 — cost: R curve leaks slightly into sRGB G/B
+Task 7: Ruling: parametric curve → control points + Fritsch–Carlson, baked into luts.tone; order tone→rgb→r/g/b — cost: look only
+Task 7: Ruling: HSL centres in OKLab hue deg (25,55,105,142,195,264,294,328), smoothstep tents; hue shift ±30°; vibrance skin protection 50°±25°; grading σ=1 ↔ chroma 0.1 — cost: retune
+Task 7: Ruling: dither excluded from developPixel (deterministic parity); added at 8-bit quantization in Task 13/21 — cost: none
+Task 16: Ruling: added @types/node@22 dev + tests/e2e/node.d.ts — cost: Node globals visible to src typecheck
+Task 16: Ruling: saveExport returns Promise<string> (plan) — cost: none
+Task 16: Ruling: readSidecar throws CorruptSidecarError on bad JSON; caller (Task 19) must catch → quarantineSidecar — cost: Task 19 must handle
+Task 16: Ruling: repeated quarantine never overwrites earlier .bak (a.jpg.json.bak, a.jpg.json-2.bak) — cost: none
+Task 16: Ruling: FolderBackend holds one root folder; addSource replaces it; id = <root>/<relpath> — cost: multi-root later needs rework
+Task 16: Ruling: dot-folders skipped; ids validated (no .., root match, image name) — cost: none
+Task 16: Ruling: HandleStore {get,set} keys root/export/presets; idbHandleStore() in handles.ts (untested in Node); setExportDir/setPresetDir(handle) — cost: small
+Task 16: Ruling: shared helpers in src/storage/fs.ts (DirectoryPresetStore, writer, quarantine, unique save); preset identity = JSON name; no preset dir → empty list / StorageError('no-preset-dir') on save — cost: none
+Task 16: Ruling: runStorageContract(runner{test,expect}, makeSubject) reusable in Vitest and browser — cost: none
+Task 17: Ruling: e2e harness bundled in beforeAll via vite build() and served by page.route under /__e2e/; not in dist — cost: spec update if vite API changes
+Task 17: Ruling: OPFS preset filenames ASCII-only (Chromium OPFS rejected non-ASCII names) — cost: none
+Task 17: Ruling: library saveExport de-dupes names per instance; share() then <a download> fallback — cost: low
+Task 17: Ruling: addSource() stores ImportResult in backend.lastImport (interface returns void) — cost: none
+Task 17: Ruling: import writes meta.json last; list skips folders without meta; QuotaExceeded mid-write removes partial and rejects 'quota'; original stored as original.<lower ext> — cost: none
+Task 17: Ruling: looksTranscoded false for empty/octet-stream type; RAW ext counts transcoded only for display MIME types — cost: iOS conversion with empty type undetected
+Task 17: Ruling: sync-access fallback writes .tmp then move(); without move() rewrites in place — cost: brief window where only .tmp holds data
