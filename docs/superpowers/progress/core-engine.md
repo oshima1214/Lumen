@@ -21,3 +21,6 @@ Task 1: Ruling: APP_ID lives in src/app-id.ts and is re-exported from main.ts �
 Task 1: Ruling: no `webkit-layout` Playwright project — WebKit browser is not preinstalled in this environment and the environment says not to run `playwright install`; layout/mobile tests use Chromium with iPhone viewport emulation, OPFS contract runs in Chromium only, iPhone specifics go to docs/iphone-checklist.md (Task 28) — cost if wrong: Safari-only layout/OPFS bugs found later on device
 Ledger mirror: docs/superpowers/progress/core-engine.md is a committed copy of this ledger (survives container loss) — user approved resume plan
 Task 1: complete (commits 72ee045..9af56e8, tests: sh -c 'npx vitest run && npx playwright test --trace off' →   1 passed (2.7s))
+Parallel: Ruling: run track A (Tasks 2-7, subagent, branch feat/track-a) and track C (Tasks 16-17, subagent, branch feat/track-c) in parallel with me on track B (Tasks 8-11) — user approved — cost: merge work
+Parallel: Ruling: shared types (DevelopParams, DeepPartial, SourceInfo, Preset, HSL_BANDS) committed up front in src/params/types.ts; sidecar.ts/presets.ts/partial.ts re-export them instead of defining — lets C compile against Preset/SourceInfo without A's branch — cost: none
+Parallel: Ruling: Task 18 (thumb cache) moves from track C to me after Task 11 — it consumes Decoder.preview from track B — cost: none
