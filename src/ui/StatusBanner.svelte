@@ -15,6 +15,7 @@
     if (ed.currentId !== null && ed.readOnly && !s.corrupted && !s.notice) out.push({ text: '新しいバージョンで保存された編集のため、読み取り専用で開いています', danger: false });
     if (s.sourceChanged) out.push({ text: '元ファイルが変わった可能性があります（編集は適用しています）', danger: false });
     if (s.notice) out.push({ text: s.notice, danger: false });
+    if (app.info) out.push({ text: app.info, danger: false });
     return out;
   });
 </script>

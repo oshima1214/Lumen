@@ -1,11 +1,12 @@
 // アプリ全体の組み立てと、画面をまたぐ操作（フォルダを開く・権限の再許可・画像送り）。
 // コンポーネントは context（src/ui/context.ts）からこれを受け取る。
+import { SvelteMap } from 'svelte/reactivity';
 import { ThumbCache } from '../cache/thumbs';
 import { Decoder } from '../decode/client';
 import { createGpu } from '../engine/gpu';
 import { Renderer } from '../engine/renderer';
 import type { Platform } from '../platform/detect';
-import { requestPersistence } from '../storage/library';
+import { LibraryBackend, requestPersistence } from '../storage/library';
 import type { StorageBackend } from '../storage/types';
 import { createEditor, type Editor } from '../store/editor.svelte';
 import { createBackend, testBackend } from './backend';
@@ -25,7 +26,22 @@ export class App {
   persisted = $state<boolean | null>(null);
   /** 一覧の読み込みや取り込みの失敗 */
   error = $state<string | null>(null);
+  /** 取り込み後の案内など（警告ではない情報） */
+  info = $state<string | null>(null);
   loading = $state(true);
+  /** 左のブラウザで選んだグループ（folder: 相対パス / library: 取り込み日）。null はすべて */
+  group = $state<string | null>(null);
+  /** 'crop' は切り抜きツール（R キー。ツール本体は Task 25） */
+  tool = $state<'develop' | 'crop'>('develop');
+  /** 書き出しの要求回数（Ctrl+Shift+E。ダイアログは Task 26 がこれを見て開く） */
+  exportRequested = $state(0);
+  /** このセッションで見たレーティング（Editor は現在の画像の分だけを持つ） */
+  readonly ratings = new SvelteMap<string, number>();
+  /** フィルムストリップに出す画像（グループで絞り込み） */
+  visible = $derived.by(() => {
+    const g = this.group, all = this.editor.images;
+    return g === null ? all : all.filter((r) => r.group === g || r.group.startsWith(`${g}/`));
+  });
 
   constructor(
     readonly platform: Platform,
@@ -53,16 +69,28 @@ export class App {
   private async reload(): Promise<void> {
     await this.editor.refresh();
     const ed = this.editor;
-    const keep = ed.currentId !== null && ed.images.some((r) => r.id === ed.currentId);
-    if (!keep && ed.images[0]) await this.select(ed.images[0].id);
+    const keep = ed.currentId !== null && this.visible.some((r) => r.id === ed.currentId);
+    const first = this.visible[0];
+    if (!keep && first) await this.select(first.id);
   }
 
   /** folder: フォルダを開く / library: 写真を取り込む */
   async addSource(): Promise<void> {
     this.error = null;
+    this.info = null;
     try {
       await this.backend.addSource();
       this.needsPermission = false;
+      this.group = null;
+      if (this.backend instanceof LibraryBackend) {
+        const r = this.backend.lastImport;
+        if (r && r.transcoded.length > 0) {
+          this.info = `${r.transcoded.length} 枚は JPEG に変換されて渡されました。「ファイル」から選ぶとオリジナルのまま取り込めます。`;
+        }
+        if (r && r.rejected.length > 0) {
+          this.error = `取り込めなかった写真: ${r.rejected.map((x) => `${x.name}（${x.reason === 'quota' ? '容量不足' : '非対応の形式'}）`).join('、')}`;
+        }
+      }
       await this.reload();
     } catch (e) {
       if (!isAbort(e)) this.error = message(e);
@@ -89,7 +117,7 @@ export class App {
       ed.selection = ed.selection.includes(id) ? ed.selection.filter((x) => x !== id) : [...ed.selection, id];
       if (ed.selection.length === 0) ed.selection = [id];
     } else if (mode === 'range' && ed.currentId !== null) {
-      const ids = ed.images.map((r) => r.id);
+      const ids = this.visible.map((r) => r.id);
       const a = ids.indexOf(ed.currentId), b = ids.indexOf(id);
       if (a >= 0 && b >= 0) ed.selection = ids.slice(Math.min(a, b), Math.max(a, b) + 1);
       return;
@@ -99,11 +127,19 @@ export class App {
     if (ed.currentId !== id) await ed.open(id);
   }
 
+  /** 左のブラウザでグループを選ぶ。現在の画像が外れたら先頭を開く */
+  async showGroup(g: string | null): Promise<void> {
+    this.group = g;
+    const ed = this.editor;
+    if (!this.visible.some((r) => r.id === ed.currentId) && this.visible[0]) await this.select(this.visible[0].id);
+  }
+
   /** 画像送り（delta = +1 で次、-1 で前） */
   async step(delta: number): Promise<void> {
     const ed = this.editor;
-    const i = ed.images.findIndex((r) => r.id === ed.currentId);
-    const next = ed.images[Math.min(ed.images.length - 1, Math.max(0, i + delta))];
+    const list = this.visible;
+    const i = list.findIndex((r) => r.id === ed.currentId);
+    const next = list[Math.min(list.length - 1, Math.max(0, i + delta))];
     if (next && next.id !== ed.currentId) await this.select(next.id);
   }
 }
