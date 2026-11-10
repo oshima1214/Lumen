@@ -77,10 +77,14 @@ export class Renderer {
       hist: device.createComputePipeline({ label: 'histogram', layout: 'auto', compute: { module, entryPoint: 'main' } }), dummy };
   }
 
+  private destroyed = false;
+  private unwatch: (() => void) | null = null;
+
   private watchLost(): void {
     const gpu = this.gpu;
-    gpu.onLost(() => {
-      if (gpu !== this.gpu) return;
+    this.unwatch?.();
+    this.unwatch = gpu.onLost(() => {
+      if (gpu !== this.gpu || this.destroyed) return;   // 破棄済みの Renderer は復活させない（最終レビュー C1）
       this.ready = (async () => {
         this.gpu = await (this.opts.recreateGpu ?? createGpu)();
         ({ develop: this.develop, localTone: this.localTone, hist: this.histPipeline, dummy: this.dummyBase } = this.build(this.gpu));
@@ -261,6 +265,9 @@ export class Renderer {
   get currentGpu(): Gpu { return this.gpu; }
 
   destroy(): void {
+    this.destroyed = true;
+    this.unwatch?.(); this.unwatch = null;
+    this.img = null; this.last = null;
     if (this.raf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this.raf);
     this.gimg?.destroy(); this.out?.destroy(); this.dummyBase.destroy();
     this.develop.destroy(); this.localTone.destroy();

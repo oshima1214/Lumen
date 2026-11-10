@@ -19,8 +19,10 @@ async function make(opts: { previewCap?: number } = {}) {
   const canvas = document.createElement('canvas');
   document.body.append(canvas);
   const gpu = await createGpu();
-  const r = new Renderer(gpu, canvas, { previewCap: opts.previewCap ?? 2560, outSpace: 'srgb' });
-  return { r, gpu, canvas };
+  const recreated = { count: 0 };
+  const r = new Renderer(gpu, canvas, { previewCap: opts.previewCap ?? 2560, outSpace: 'srgb',
+    recreateGpu: async () => { recreated.count++; return createGpu(); } });
+  return { r, gpu, canvas, recreated };
 }
 const view = (w: number, h: number) => ({ mode: 'fit' as const, cx: 0.5, cy: 0.5, before: false, background: 'dark' as const, viewport: { w, h } });
 

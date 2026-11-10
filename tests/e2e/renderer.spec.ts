@@ -83,3 +83,17 @@ test('デバイス喪失のあと新しいデバイスで描画し直せる', as
   });
   expect(px[0]!).toBeGreaterThan(100);
 });
+
+test('破棄した Renderer はデバイス喪失で復活しない（最終レビュー C1）', async ({ page }) => {
+  await h.open(page);
+  const n = await page.evaluate(async () => {
+    const { make, image } = (window as unknown as W).__r;
+    const { r, gpu, recreated } = await make();
+    await r.setImage(image(32, 32, 1, () => [0.5, 0.5, 0.5]));
+    r.destroy();
+    gpu.device.destroy();
+    await new Promise((ok) => setTimeout(ok, 300));
+    return recreated.count;
+  });
+  expect(n).toBe(0);
+});

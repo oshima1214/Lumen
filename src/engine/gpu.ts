@@ -4,7 +4,8 @@
 export interface Gpu {
   device: GPUDevice;
   limits: GPUSupportedLimits;
-  onLost(cb: () => void): void;
+  /** デバイス喪失時のコールバックを登録する。戻り値で登録を解除する */
+  onLost(cb: () => void): () => void;
 }
 
 export const GPU_INIT_ERROR = 'WebGPU を初期化できません';
@@ -40,8 +41,10 @@ export async function createGpu(): Promise<Gpu> {
     device,
     limits: device.limits,
     onLost(cb) {
-      if (lost) queueMicrotask(cb);
+      let active = true;
+      if (lost) queueMicrotask(() => { if (active) cb(); });
       else listeners.push(cb);
+      return () => { active = false; const i = listeners.indexOf(cb); if (i >= 0) listeners.splice(i, 1); };
     },
   };
 }
