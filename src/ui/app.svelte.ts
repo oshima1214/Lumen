@@ -156,8 +156,17 @@ export class App {
   async addSource(): Promise<void> {
     this.error = null;
     this.info = null;
+    // フォルダ方式: 開き直すと同じ id が別のファイルを指しうる。保留中の保存は今のフォルダへ書き始めておき
+    // （フォルダ選択はクリック直後に開く必要があるので待たない）、選び終わったら状態を捨てる（最終レビュー I1）
+    const folder = this.backend.kind === 'folder';
+    const flushing = folder ? this.editor.flush().catch(() => undefined) : null;
     try {
       await this.backend.addSource();
+      if (folder) {
+        await flushing;
+        if (this.tool === 'crop') this.cancelCrop();
+        await this.editor.reset();
+      }
       this.needsPermission = false;
       this.group = null;
       if (this.backend instanceof LibraryBackend) {

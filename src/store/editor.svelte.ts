@@ -85,6 +85,8 @@ export interface Editor {
   paste(ids: string[]): Promise<{ failed: string[] }>;
   applyPreset(p: Preset, ids?: string[]): Promise<void>;
   flush(): Promise<void>;
+  /** 取り込み元が変わったとき（フォルダを開き直すなど）: 保留中の保存を書き切ってから、画像ごとの状態を捨てる */
+  reset(): Promise<void>;
 }
 
 interface ImageState {
@@ -464,6 +466,23 @@ class EditorImpl implements Editor {
 
   async flush(): Promise<void> {
     await Promise.all([...this.slots.keys()].map((id) => this.flushId(id)));
+  }
+
+  async reset(): Promise<void> {
+    // 同じ id でも別のファイルを指しうる（同名フォルダ）ので、状態の使い回しをやめる（最終レビュー I1）
+    ++this.openToken;
+    await this.flush().catch(() => undefined);
+    for (const s of this.slots.values()) {
+      if (s.timer !== null) this.deps.clearTimeout(s.timer);
+      if (s.retry !== null) this.deps.clearTimeout(s.retry);
+    }
+    if (this.handle !== null) this.deps.decoder.close(this.handle);
+    this.states.clear(); this.slots.clear(); this.failing.clear();
+    this.currentId = null; this.handle = null; this.working = null;
+    this.selection = []; this.previewCrop = null;
+    this.params = defaultParams(); this.rating = 0; this.readOnly = false;
+    this.canUndo = false; this.canRedo = false;
+    this.status = { saveError: null, sourceChanged: false, corrupted: false, decodeError: null, notice: null };
   }
 }
 

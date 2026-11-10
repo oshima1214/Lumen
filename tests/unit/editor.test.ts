@@ -561,3 +561,25 @@ describe('他のアプリの JSON', () => {
     expect(editor.status.corrupted).toBe(true);
   });
 });
+
+// ---- 最終レビュー I1: 開き直したフォルダ（同じ名前の別フォルダ）で前の画像の状態を使い回さない ----
+describe('reset（保存方式の取り込み元が変わったとき）', () => {
+  it('保留中の保存を前のフォルダに書いてから、状態を捨てて新しいサイドカーを読み直す', async () => {
+    const { editor, backend } = setup();
+    await editor.refresh(); await editor.open('A');
+    editor.update((p) => { p.basic.exposure = 1; });
+    await editor.reset();                                   // 500ms 待たずに切り替え
+    expect(exposureOf(backend.sidecars.get('A'))).toBe(1);  // 前のフォルダに書き切った
+    expect(editor.currentId).toBeNull();
+    expect(editor.working).toBeNull();
+    // 新しいフォルダの同じ id には別の編集が入っている
+    const p2 = defaultParams(); p2.basic.exposure = -2;
+    backend.sidecars.set('A', toSidecar(p2, { name: 'A.jpg', size: 100, mtime: 1000 }, 0));
+    const writesBefore = backend.writes.length;
+    await editor.refresh(); await editor.open('A');
+    expect(editor.params.basic.exposure).toBe(-2);
+    expect(editor.canUndo).toBe(false);
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(backend.writes.length).toBe(writesBefore);       // 開いただけでは上書きしない
+  });
+});
