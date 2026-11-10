@@ -76,3 +76,31 @@ test('合成 HEIC（libheif 経路）は寸法と中間灰を返す', async ({ p
   expect(r.o).toBe(1);
   expect(Math.abs(r.g - 0.2158)).toBeLessThan(0.03);
 });
+
+// 最終レビュー I5a: iOS のキャンバス面積の上限に当たらないよう帯に分けて読む。帯の高さによらず同じ画素になること
+test('帯に分けて読んでも 1 回で読んだのと同じ画素', async ({ page }) => {
+  await h.open(page);
+  const same = await page.evaluate(async () => {
+    const d = (window as unknown as W).__decode;
+    for (const p of ['fixtures/gradient.png', 'fixtures/pano9000.jpg']) {
+      const f = await d.file(p);
+      const a = await d.decodeDisplay(f), b = await d.decodeDisplay(f, { bandRows: 7 });
+      if (a.width !== b.width || a.height !== b.height) return `${p}: size`;
+      for (let i = 0; i < a.pixels.length; i++) if (a.pixels[i] !== b.pixels[i]) return `${p}: pixel ${i}`;
+    }
+    return 'same';
+  });
+  expect(same).toBe('same');
+});
+
+// 最終レビュー I5b: 埋め込みプロファイルの変換はブラウザに任せ、Display P3 として読む
+test('P3 タグ付きの赤は sRGB の赤より彩度が高い（Rec.2020 の G 成分が小さい）', async ({ page }) => {
+  await h.open(page);
+  const r = await page.evaluate(async () => {
+    const d = (window as unknown as W).__decode;
+    const g = async (p: string) => { const img = await d.decodeDisplay(await d.file(p)); return [0, 1, 2].map((c) => img.pixels[(8 * img.width + 8) * 3 + c]! / 65535); };
+    return { p3: await g('fixtures/red-p3.jpg'), srgb: await g('fixtures/red-srgb.jpg') };
+  });
+  expect(r.p3[1]!).toBeLessThan(r.srgb[1]! - 0.02);
+  expect(r.srgb[0]!).toBeGreaterThan(0.5);
+});

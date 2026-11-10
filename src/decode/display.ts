@@ -1,7 +1,10 @@
 // JPEG / PNG（と Safari の HEIC）をブラウザ標準でデコードし、リニア Rec.2020 にする（仕様 3.1）。
-// 返す画素と orientation の組は常に整合する（向き未適用なら EXIF の値、適用済みなら 1）。埋め込み ICC は Display P3 か否かだけ判定する。
+// - 返す画素と orientation の組は常に整合する（向き未適用なら EXIF の値、適用済みなら 1。判定は orientation.ts）
+// - 色: 埋め込みプロファイル（sRGB / Display P3 / Adobe RGB など）の変換はブラウザに任せ、Display P3 のキャンバスで読む
+// - iOS のキャンバス面積の上限（約 16.7MP）に当たらないよう、帯（bandRows 行ずつ）に分けて読む（最終レビュー I5）
 import { readExif } from './exif';
 import { rgba8ToLinear2020 } from './encoded';
+import { resolveOrientation } from './orientation';
 import type { DecodedImage } from './types';
 
 // ブラウザによっては imageOrientation: 'none' を無視して EXIF の向きを適用する（Chromium で確認）。
@@ -19,22 +22,28 @@ function browserAppliesOrientation(): Promise<boolean> {
   return appliesOrientation;
 }
 
-export async function decodeDisplay(file: Blob): Promise<DecodedImage> {
+const BAND_ROWS = 1024;
+
+export async function decodeDisplay(file: Blob, opts: { bandRows?: number; heic?: boolean } = {}): Promise<DecodedImage> {
   const meta = await readExif(file);
-  const bmp = await createImageBitmap(file, { imageOrientation: 'none', colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+  const bmp = await createImageBitmap(file, { imageOrientation: 'none', premultiplyAlpha: 'none' });
   try {
     const { width, height } = bmp;
-    const canvas = new OffscreenCanvas(width, height);
-    const ctx = canvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
+    const band = Math.max(1, Math.min(height, opts.bandRows ?? BAND_ROWS));
+    const canvas = new OffscreenCanvas(width, band);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true, colorSpace: 'display-p3' });
     if (!ctx) throw new Error('2D コンテキストを作れません');
-    ctx.drawImage(bmp, 0, 0);
-    const data = ctx.getImageData(0, 0, width, height).data;
-    // 向きが適用済みなら画素はすでに正立しているので orientation は 1
-    const orientation = (await browserAppliesOrientation()) ? 1 : meta.orientation;
-    return {
-      width, height, orientation, kind: 'display',
-      pixels: rgba8ToLinear2020(data, meta.iccIsP3 ? 'p3' : 'srgb'), exif: meta.exif,
-    };
+    const pixels = new Uint16Array(width * height * 3);
+    for (let y = 0; y < height; y += band) {
+      const rows = Math.min(band, height - y);
+      ctx.clearRect(0, 0, width, band);
+      ctx.drawImage(bmp, 0, y, width, rows, 0, 0, width, rows);
+      const data = ctx.getImageData(0, 0, width, rows, { colorSpace: 'display-p3' }).data;
+      pixels.set(rgba8ToLinear2020(data, 'p3'), y * width * 3);
+    }
+    const orientation = resolveOrientation({ exif: meta.orientation, exifDims: meta.dims, bitmap: { w: width, h: height },
+      probeApplies: await browserAppliesOrientation(), heic: opts.heic ?? false });
+    return { width, height, orientation, kind: 'display', pixels, exif: meta.exif };
   } finally {
     bmp.close();
   }

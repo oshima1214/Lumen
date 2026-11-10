@@ -13,7 +13,7 @@ interface Libheif { HeifDecoder: new () => { decode(buf: Uint8Array): HeifImage[
 let libheif: Promise<Libheif> | null = null;
 
 export async function decodeHeic(file: Blob): Promise<DecodedImage> {
-  if (isSafari()) return decodeDisplay(file);
+  if (isSafari()) return decodeDisplay(file, { heic: true });
   const meta = await readExif(file);
   libheif ??= import('libheif-js/libheif-wasm/libheif-bundle.mjs').then((m) => (m.default as () => Libheif)());
   const lib = await libheif;

@@ -31,3 +31,7 @@ try:
     Image.new('RGB', (64, 48), (128, 128, 128)).save(out / 'gray128.heic', quality=95)
 except ImportError:
     print('pillow-heif が無いので gray128.heic はスキップ')
+# Display P3 タグ付きの純赤 JPEG（色空間の扱いの検証用。ICC は src/export/icc/DisplayP3.icc、CC0）
+p3 = (Path(__file__).parent.parent.parent / 'src/export/icc/DisplayP3.icc').read_bytes()
+Image.new('RGB', (16, 16), (255, 0, 0)).save(out / 'red-p3.jpg', quality=100, subsampling=0, icc_profile=p3)
+Image.new('RGB', (16, 16), (255, 0, 0)).save(out / 'red-srgb.jpg', quality=100, subsampling=0)
