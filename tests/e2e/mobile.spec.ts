@@ -57,13 +57,34 @@ test('左にスワイプすると次の写真', async ({ page }) => {
   await page.waitForFunction((f) => (window as unknown as { __lumenApp: Lumen }).__lumenApp.editor.currentId !== f, first);
 });
 
-test('共有ボタンで現在の写真を JPEG にして共有シートへ渡す', async ({ page }) => {
+// 最終レビュー I3: 共有シートはタップの直後でないと開けない（Safari）。書き出しが終わってから「共有する」をもう一度押す 2 段階
+test('共有: 書き出し後に「共有する」を押すと JPEG を共有シートへ渡す', async ({ page }) => {
   await openEditor(page);
-  await page.getByRole('button', { name: '共有' }).click();
-  await page.waitForFunction(() => (window as unknown as { __shared: File[] }).__shared.length === 1, undefined, { timeout: 60_000 });
-  const f = await page.evaluate(() => { const x = (window as unknown as { __shared: File[] }).__shared[0]!; return { type: x.type, name: x.name, size: x.size }; });
+  await page.getByRole('button', { name: '共有', exact: true }).click();
+  const send = page.getByRole('button', { name: /共有する/ });
+  await expect(send).toBeVisible({ timeout: 60_000 });
+  expect(await page.evaluate(() => (window as unknown as { __shared: File[] }).__shared.length)).toBe(0);
+  await send.click();
+  await page.waitForFunction(() => (window as unknown as { __shared: File[] }).__shared.length === 1);
+  const f = await page.evaluate(() => { const x = (window as unknown as { __shared: File[] }).__shared[0]!; return { type: x.type, size: x.size }; });
   expect(f.type).toBe('image/jpeg');
   expect(f.size).toBeGreaterThan(100);
+});
+
+test('一覧で 2 枚選んで共有すると、1 回の共有シートに 2 枚まとめて渡す', async ({ page }) => {
+  await app.open(page, { backend: 'library' });
+  const items = page.getByTestId('grid-item');
+  await expect(items).toHaveCount(3);
+  const b0 = (await items.nth(0).boundingBox())!;
+  await page.mouse.move(b0.x + b0.width / 2, b0.y + b0.height / 2);
+  await page.mouse.down(); await page.waitForTimeout(700); await page.mouse.up();
+  await items.nth(1).click();
+  await page.getByRole('button', { name: '共有', exact: true }).click();
+  const send = page.getByRole('button', { name: /共有する/ });
+  await expect(send).toBeVisible({ timeout: 60_000 });
+  await send.click();
+  await page.waitForFunction(() => (window as unknown as { __shared: File[] }).__shared.length === 2);
+  expect(await page.evaluate(() => (window as unknown as { __shareCalls: number[] }).__shareCalls)).toEqual([2]);
 });
 
 test('取り込みで HEIC 名の JPEG を渡すと「ファイル」から選ぶ案内が出る', async ({ page }) => {

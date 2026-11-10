@@ -228,6 +228,13 @@ export class LibraryBackend implements StorageBackend {
     return actual;
   }
 
+  /** 複数のファイルを 1 回の共有シートで渡す（仕様 6「複数枚はまとめて共有」）。共有できなければ 1 枚ずつダウンロード。
+   *  共有シートはタップの直後にしか開けないので、呼び出し側はボタンのクリック処理の中から呼ぶ（最終レビュー I3） */
+  async shareFiles(files: File[]): Promise<void> {
+    if (files.length === 0) return;
+    if (!(await this.deps.share(files))) for (const f of files) (this.deps.download ?? anchorDownload)(f);
+  }
+
   async needsPermission(): Promise<boolean> { return false; }
   async requestPermission(): Promise<boolean> { return true; }
 }

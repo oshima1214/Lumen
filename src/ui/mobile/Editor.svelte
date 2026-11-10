@@ -11,7 +11,8 @@
   import CropOverlay from '../panels/CropOverlay.svelte';
   import Histogram from '../panels/Histogram.svelte';
   import { GestureRecognizer } from './gestures';
-  import { shareImages } from './share';
+  import { prepareShare, type PreparedShare } from './share';
+  import SharePrompt from './SharePrompt.svelte';
   import ToolTabs from './ToolTabs.svelte';
 
   let { onback }: { onback: () => void } = $props();
@@ -54,11 +55,17 @@
   function down(e: PointerEvent): void { pinchBase = zoom.s; rec.pointerDown(e); host.setPointerCapture?.(e.pointerId); }
   function up(e: PointerEvent): void { rec.pointerUp(e); if (zoom.s <= 1.01) zoom = { s: 1, x: 0, y: 0 }; }
 
+  let ready = $state<PreparedShare | null>(null);
   async function share(): Promise<void> {
     if (!ed.currentId) return;
     busy = '書き出し中…';
-    const r = await shareImages(app, [ed.currentId]);
-    busy = r.failed.length ? `書き出せませんでした: ${r.failed[0]!.reason}` : null;
+    try {
+      const r = await prepareShare(app, [ed.currentId]);
+      busy = r.files.length === 0 ? `書き出せませんでした: ${r.failed[0]?.reason ?? ''}` : null;
+      if (r.files.length > 0) ready = r;
+    } catch (e) {
+      busy = `書き出せませんでした: ${e instanceof Error ? e.message : String(e)}`;
+    }
   }
 </script>
 
@@ -87,6 +94,7 @@
   </div>
   <details class="hist"><summary>ヒストグラム</summary><Histogram /></details>
   <ToolTabs />
+  {#if ready}<SharePrompt files={ready.files} failed={ready.failed.length} ondone={() => (ready = null)} />{/if}
 </div>
 
 <style>

@@ -25,9 +25,10 @@ async function startLibrary(q: URLSearchParams): Promise<void> {
   const name = `lib-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const root = await opfs.getDirectoryHandle(name, { create: true });
   const shared: File[] = [];
+  const shareCalls: number[] = [];   // 1 回の共有で渡されたファイル数
   const backend = new LibraryBackend({
     root, pickFiles, now: () => new Date(),
-    share: async (files) => { shared.push(...files); return true; },
+    share: async (files) => { shareCalls.push(files.length); shared.push(...files); return true; },
     estimate: async () => ({ usage: 0, quota: 1e12 }),
   });
   const files: File[] = [];
@@ -36,9 +37,10 @@ async function startLibrary(q: URLSearchParams): Promise<void> {
     else files.push(new File([await (await fetch(`/__e2e/files/fixtures/${fixture}`)).blob()], n, { type: n.endsWith('.png') ? 'image/png' : 'image/jpeg' }));
   }
   await backend.importFiles(files);
-  const w = window as unknown as { __lumenTestBackend: unknown; __shared: File[] };
+  const w = window as unknown as { __lumenTestBackend: unknown; __shared: File[]; __shareCalls: number[] };
   w.__lumenTestBackend = backend;
   w.__shared = shared;
+  w.__shareCalls = shareCalls;
   await import('../../../src/main');
 }
 

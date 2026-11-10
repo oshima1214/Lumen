@@ -4,7 +4,8 @@
   import Plus from 'lucide-svelte/icons/plus';
   import Thumb from '../desktop/Thumb.svelte';
   import { useApp } from '../context';
-  import { shareImages } from './share';
+  import { prepareShare, type PreparedShare } from './share';
+  import SharePrompt from './SharePrompt.svelte';
 
   let { onopen }: { onopen: () => void } = $props();
   const app = useApp();
@@ -31,10 +32,16 @@
   function done(): void { selecting = false; picked = []; }
 
   async function paste(): Promise<void> { busy = '貼り付け中…'; await ed.paste(picked); busy = null; done(); }
+  let ready = $state<PreparedShare | null>(null);
   async function share(): Promise<void> {
     busy = '書き出し中…';
-    const r = await shareImages(app, picked, (d, t) => (busy = `書き出し中… ${d}/${t}`));
-    busy = r.failed.length ? `${r.failed.length} 枚を書き出せませんでした` : null;
+    try {
+      const r = await prepareShare(app, picked, (d, t) => (busy = `書き出し中… ${d}/${t}`));
+      busy = r.files.length === 0 ? `${r.failed.length} 枚を書き出せませんでした` : null;
+      if (r.files.length > 0) ready = r;
+    } catch (e) {
+      busy = `書き出せませんでした: ${e instanceof Error ? e.message : String(e)}`;
+    }
     done();
   }
   async function remove(): Promise<void> {
@@ -69,6 +76,7 @@
       </div>
     {/each}
   </div>
+  {#if ready}<SharePrompt files={ready.files} failed={ready.failed.length} ondone={() => (ready = null)} />{/if}
   <button class="fab" aria-label={addLabel} title={addLabel} onclick={() => app.addSource()}><Plus size={28} /></button>
 </div>
 
