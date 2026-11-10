@@ -94,24 +94,35 @@ export class FolderBackend implements StorageBackend {
     return ok;
   }
 
+  /** 直近の list() で読めずに飛ばした項目（相対パス）。UI が案内に使う（最終レビュー I6） */
+  skipped: string[] = [];
+
   async list(): Promise<ImageRef[]> {
     await this.load();
     const root = this.handles.root;
     if (!root) return [];
     const out: ImageRef[] = [];
+    const skipped: string[] = [];
     const walk = async (dir: FileSystemDirectoryHandle, rel: string): Promise<void> => {
       for await (const h of entriesOf(dir)) {
         if (h.name.startsWith('.')) continue;
+        const path = rel === '' ? h.name : `${rel}/${h.name}`;
         if (h.kind === 'directory') {
-          await walk(h as FileSystemDirectoryHandle, rel === '' ? h.name : `${rel}/${h.name}`);
+          // 中を読めないフォルダ（例: SD カード直下の System Volume Information）は飛ばす
+          try { await walk(h as FileSystemDirectoryHandle, path); } catch { skipped.push(path); }
         } else if (isImageName(h.name)) {
-          const f = await (h as FileSystemFileHandle).getFile();
-          const path = rel === '' ? h.name : `${rel}/${h.name}`;
-          out.push({ id: `${root.name}/${path}`, name: h.name, size: f.size, mtime: f.lastModified, group: rel });
+          // 読めないファイル（例: OneDrive のオンライン専用ファイル）は飛ばす。その 1 枚以外は一覧に出す
+          try {
+            const f = await (h as FileSystemFileHandle).getFile();
+            out.push({ id: `${root.name}/${path}`, name: h.name, size: f.size, mtime: f.lastModified, group: rel });
+          } catch {
+            skipped.push(path);
+          }
         }
       }
     };
-    await walk(root, '');
+    await walk(root, '');   // ルート自体を読めない場合はエラーにする（権限の再許可などの案内へ）
+    this.skipped = skipped;
     return out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   }
 

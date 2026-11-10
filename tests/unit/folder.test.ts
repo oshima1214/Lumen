@@ -217,3 +217,22 @@ describe('FolderBackend の書き出し先・プリセットフォルダ名（Ta
     expect(await again.dirName('presets')).toBeNull();
   });
 });
+
+// 最終レビュー I6: 読めないファイル（OneDrive のプレースホルダーなど）や読めないサブフォルダがあっても一覧は続ける
+describe('FolderBackend: 読めない項目を飛ばす', () => {
+  test('getFile が失敗する画像と、中を列挙できないサブフォルダを飛ばし、残りを返す', async () => {
+    const { backend, root } = await setup((r) => {
+      r.put('a.jpg', 'a');
+      r.put('b.jpg', 'b');
+      r.put('locked/c.jpg', 'c');
+      r.put('ok/d.jpg', 'd');
+    });
+    const b = (root as unknown as { children: Map<string, { getFile?: () => Promise<File>; values?: () => AsyncGenerator }> }).children;
+    b.get('b.jpg')!.getFile = async () => { throw new DOMException('placeholder', 'NotReadableError'); };
+    const locked = b.get('locked')!;
+    locked.values = async function* () { throw new DOMException('denied', 'NotAllowedError'); };
+    const list = await backend.list();
+    expect(list.map((x) => x.name)).toEqual(['a.jpg', 'd.jpg']);
+    expect(backend.skipped).toEqual(['b.jpg', 'locked']);
+  });
+});

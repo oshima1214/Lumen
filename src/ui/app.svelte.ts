@@ -140,6 +140,12 @@ export class App {
 
   private async reload(): Promise<void> {
     await this.editor.refresh();
+    // 読めずに飛ばした項目があれば知らせる（最終レビュー I6）
+    const skipped = (this.backend as { skipped?: string[] }).skipped ?? [];
+    if (skipped.length > 0) {
+      const names = skipped.slice(0, 3).join('、') + (skipped.length > 3 ? ` ほか ${skipped.length - 3} 件` : '');
+      this.info = `読み込めない項目を飛ばしました: ${names}`;
+    }
     const ed = this.editor;
     const keep = ed.currentId !== null && this.visible.some((r) => r.id === ed.currentId);
     const first = this.visible[0];
