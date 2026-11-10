@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   // iPhone の編集画面（仕様 5.1）: 上に写真（ピンチで拡大・2 本指で移動・長押しで編集前・左右スワイプで画像送り）、
   // 下にツールのタブ。上部に戻る・取り消し・やり直し・共有・メニュー（設定のコピー／貼り付け）。
   import ArrowLeft from 'lucide-svelte/icons/arrow-left';
@@ -28,10 +29,14 @@
     const canvas = app.canvas;
     canvas.classList.add('lumen-canvas');
     host.prepend(canvas);
-    const measure = () => {
+    // setView は ed.view を読むので、そのまま呼ぶとこの $effect が view に依存して無限ループになる。
+    // untrack で依存を作らず、値が変わったときだけ書く（PC のビューアと同じ）
+    const measure = () => untrack(() => {
       const dpr = devicePixelRatio || 1;
-      ed.setView({ viewport: { w: Math.max(1, Math.round(host.clientWidth * dpr)), h: Math.max(1, Math.round(host.clientHeight * dpr)) } });
-    };
+      const w = Math.max(1, Math.round(host.clientWidth * dpr)), h = Math.max(1, Math.round(host.clientHeight * dpr));
+      const v = ed.view.viewport;
+      if (v.w !== w || v.h !== h) ed.setView({ viewport: { w, h } });
+    });
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(host);

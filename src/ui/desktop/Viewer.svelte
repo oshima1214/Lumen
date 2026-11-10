@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   // 中央のビューア（仕様 5.1）。App の canvas をここに置き、大きさの変化を Editor の view.viewport（デバイスピクセル）へ伝える。
   // 画面に合わせる／100%（ダブルクリックでも切り替え）、100% ではドラッグで移動、写真の周囲の背景を 3 種から選ぶ。
   import { orientedSize } from '../../engine/geometry';
@@ -24,12 +25,13 @@
     const canvas = app.canvas;
     canvas.classList.add('lumen-canvas');
     host.prepend(canvas);
-    const measure = () => {
+    // untrack: この $effect が ed.view に依存すると、表示状態が変わるたびに canvas を付け直してしまう
+    const measure = () => untrack(() => {
       const dpr = devicePixelRatio || 1;
       const w = Math.max(1, Math.round(host.clientWidth * dpr)), h = Math.max(1, Math.round(host.clientHeight * dpr));
       const v = ed.view.viewport;
       if (v.w !== w || v.h !== h) ed.setView({ viewport: { w, h } });
-    };
+    });
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(host);

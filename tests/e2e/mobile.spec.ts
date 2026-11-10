@@ -97,3 +97,17 @@ test('取り込みで HEIC 名の JPEG を渡すと「ファイル」から選�
   await expect(page.getByText(/「ファイル」から選ぶ/)).toBeVisible();
   await expect(page.getByTestId('grid-item')).toHaveCount(4);
 });
+
+// 本番で報告された不具合: 編集画面を開くと effect_update_depth_exceeded（$effect の無限ループ）がコンソールに出続けた
+test('編集画面を開いても、操作してもコンソールにエラーが出ない', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('pageerror', (e) => errors.push(e.message));
+  await openEditor(page);
+  await page.waitForTimeout(1500);
+  await page.setViewportSize({ width: 400, height: 800 });   // 表示領域の大きさが変わっても
+  await page.waitForTimeout(800);
+  await page.getByTestId('tool-tabs').getByRole('button', { name: 'カーブ' }).click();
+  await page.waitForTimeout(500);
+  expect(errors).toEqual([]);
+});
