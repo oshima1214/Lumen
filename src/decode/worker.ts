@@ -7,7 +7,7 @@ import type { WorkingImage } from './types';
 
 export interface Rect { x: number; y: number; w: number; h: number }
 export type Request =
-  | { id: number; type: 'open'; file: Blob; name: string; workCap: number }
+  | { id: number; type: 'open'; file: Blob; name: string; workCap: number; retain: boolean }
   | { id: number; type: 'readTile'; handle: string; rect: Rect }
   | { id: number; type: 'close'; handle: string }
   | { id: number; type: 'preview'; file: Blob; name: string; maxEdge: number };
@@ -39,9 +39,10 @@ async function handle(m: Request): Promise<{ value: unknown; transfer: Transfera
       current = null;                                    // 前の元データを先に手放す
       const { image } = await decodeAny(m.file, m.name);
       const handle = `h${++seq}`;
-      current = { handle, width: image.width, height: image.height, pixels: image.pixels };
       const small = downscaleArea(image.pixels, image.width, image.height, m.workCap);
-      const data = small.data === image.pixels ? image.pixels.slice() : small.data;   // 元データは Worker に残す
+      // retain: true（書き出し）なら元データを Worker に残して readTile に使う。編集用（false）は残さない（最終レビュー I4a）
+      if (m.retain) current = { handle, width: image.width, height: image.height, pixels: image.pixels };
+      const data = small.data === image.pixels && m.retain ? image.pixels.slice() : small.data;
       const working: WorkingImage = { ...image, pixels: data, width: small.width, height: small.height,
         fullWidth: image.width, fullHeight: image.height };
       return { value: { handle, working }, transfer: [data.buffer] };
@@ -56,8 +57,14 @@ async function handle(m: Request): Promise<{ value: unknown; transfer: Transfera
   }
 }
 
-self.onmessage = async (ev: MessageEvent<Request>) => {
+// 要求は 1 件ずつ順に処理する（連続した open でフル解像度のデコードが並行しないように。最終レビュー I4b）
+let queue: Promise<void> = Promise.resolve();
+self.onmessage = (ev: MessageEvent<Request>) => {
   const m = ev.data;
+  queue = queue.then(() => process(m));
+};
+
+async function process(m: Request): Promise<void> {
   try {
     const { value, transfer } = await handle(m);
     (self as unknown as Worker).postMessage({ id: m.id, ok: true, value } satisfies Response, transfer);
@@ -66,4 +73,4 @@ self.onmessage = async (ev: MessageEvent<Request>) => {
       ...(e instanceof DecodeError ? { decodeFormat: e.format } : {}) };
     (self as unknown as Worker).postMessage(res);
   }
-};
+}

@@ -96,3 +96,28 @@ test('RAW を開くと kind raw の作業画像と camToXyz', async ({ page }) =
   expect(r.long).toBe(2048);
   expect(r.m).toBe(9);
 });
+
+test('retain: false で開くとフル解像度の元データを Worker に残さない（最終レビュー I4a）', async ({ page }) => {
+  await h.open(page);
+  const err = await page.evaluate(async () => {
+    const { decoder, file } = (window as unknown as W).__dec;
+    const f = await file('fixtures/gray128.jpg');
+    const { handle, working } = await decoder.open(f, f.name, { workCap: 4096, retain: false });
+    if (working.width !== 64) return 'bad working';
+    try { await decoder.readTile(handle, { x: 0, y: 0, w: 1, h: 1 }); return null; } catch (e) { return String(e); }
+  });
+  expect(err).not.toBeNull();
+});
+
+test('連続した open は順番に処理され、最後に開いた画像が残る（最終レビュー I4b）', async ({ page }) => {
+  await h.open(page);
+  const r = await page.evaluate(async () => {
+    const { decoder, file } = (window as unknown as W).__dec;
+    const big = await file('fixtures/pano9000.jpg'), small = await file('fixtures/gray128.jpg');
+    const [a, b] = await Promise.all([decoder.open(big, big.name, { workCap: 4096 }), decoder.open(small, small.name, { workCap: 4096 })]);
+    const bOk = await decoder.readTile(b.handle, { x: 0, y: 0, w: 1, h: 1 }).then(() => true, () => false);
+    const aOk = await decoder.readTile(a.handle, { x: 0, y: 0, w: 1, h: 1 }).then(() => true, () => false);
+    return { aOk, bOk };
+  });
+  expect(r).toEqual({ aOk: false, bOk: true });
+});

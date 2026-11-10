@@ -192,7 +192,7 @@ class EditorImpl implements Editor {
       const file = await backend.readOriginal(ref.id);
       for (;;) {
         if (token !== this.openToken) return;
-        const { handle, working } = await decoder.open(file, ref.name, { workCap: cap });
+        const { handle, working } = await decoder.open(file, ref.name, { workCap: cap, retain: false });   // 編集用は元データを残さない（最終レビュー I4a）
         if (token !== this.openToken) { decoder.close(handle); return; }
         try {
           await renderer?.setImage(working);

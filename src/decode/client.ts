@@ -34,8 +34,9 @@ export class Decoder {
     });
   }
 
-  open(file: Blob, name: string, opts: { workCap: number }): Promise<{ handle: string; working: WorkingImage }> {
-    return this.call({ type: 'open', file, name, workCap: opts.workCap });
+  /** retain（既定 true）: フル解像度の元データを Worker に残して readTile できるようにする。編集用は false でメモリを節約 */
+  open(file: Blob, name: string, opts: { workCap: number; retain?: boolean }): Promise<{ handle: string; working: WorkingImage }> {
+    return this.call({ type: 'open', file, name, workCap: opts.workCap, retain: opts.retain ?? true });
   }
   /** 元データ（フル解像度、向き補正前の座標）から RGB を切り出す。範囲外は端の画素で埋める */
   readTile(handle: string, rect: Rect): Promise<Uint16Array> { return this.call({ type: 'readTile', handle, rect }); }

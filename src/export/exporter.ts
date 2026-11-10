@@ -12,6 +12,9 @@ import { sharpenMargin, type SharpenLevel } from './sharpen';
 import type { Watermark } from './watermark';
 import type { ExportWorkerRequest } from './worker';
 
+/** 書き出しの作業画像の長辺上限。ベース層（長辺 512）と色情報にしか使わないので小さくてよい（最終レビュー I4c） */
+export const EXPORT_WORK_CAP = 1024;
+
 export interface ExportSettings {
   format: 'jpeg' | 'png'; quality: number; longEdge: number | null; space: 'srgb' | 'p3';
   sharpen: SharpenLevel; nameRule: string; watermark: Watermark | null; stripGps: boolean;
@@ -58,7 +61,7 @@ export async function exportImages(ids: string[], s: ExportSettings, deps: Expor
         const raw = await deps.backend.readSidecar(id);
         const params = raw == null ? defaultParams() : fromSidecar(raw).params;
         const file = await deps.backend.readOriginal(id);
-        const { handle, working } = await deps.decoder.open(file, ref.name, { workCap: deps.workCap });
+        const { handle, working } = await deps.decoder.open(file, ref.name, { workCap: Math.min(deps.workCap, EXPORT_WORK_CAP), retain: true });
         try {
           await deps.renderer.setImage(working);
           const full = { w: working.fullWidth, h: working.fullHeight, o: working.orientation };
