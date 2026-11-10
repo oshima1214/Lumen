@@ -20,7 +20,11 @@
 `test-assets/` に置くと、該当テストが自動で有効になる（コミットされない）。
 - `test-assets/iphone.heic` … iPhone の HEIC
 
-## 無料で公開する（Cloudflare Pages）
+## 無料で公開する（Cloudflare Workers の静的アセット、または Pages）
+Workers の作成画面（「Deploy command」欄がある）の場合: Build command `npm run build`、Deploy command `npx wrangler deploy`、
+Production branch は `feat/core-engine`（または公開したいブランチ）。設定はリポジトリの `wrangler.jsonc` が使われる。
+
+Pages の場合:
 1. https://dash.cloudflare.com/ で無料アカウントを作る
 2. Workers & Pages → Create → Pages → 「Connect to Git」で GitHub の `oshima1214/Lumen` を選ぶ
 3. ビルド設定: Build command `npm run build`、Build output directory `dist`、本番ブランチは公開したいブランチ
