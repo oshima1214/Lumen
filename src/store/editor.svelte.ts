@@ -15,7 +15,7 @@ import type { WorkingImage } from '../decode/types';
 import { GpuOutOfMemoryError } from '../engine/errors';
 import { clampParams, defaultParams } from '../params/defaults';
 import { applyPartial, pickGroups } from '../params/partial';
-import { fromSidecar, SidecarError, sourceChanged, toSidecar } from '../params/sidecar';
+import { ForeignSidecarError, fromSidecar, SidecarError, sourceChanged, toSidecar } from '../params/sidecar';
 import type { DeepPartial, DevelopParams, ParamGroup, Preset, SourceInfo } from '../params/types';
 import type { Platform } from '../platform/detect';
 import { CorruptSidecarError, type ImageRef, type StorageBackend } from '../storage/types';
@@ -96,9 +96,12 @@ interface ImageState {
   sourceChanged: boolean;
   /** サイドカーを読めなかった（破損以外: 権限切れなど）。readOnly で開き、次に開くときに読み直す */
   unreadable: boolean;
+  /** 同じ名前の JSON が他のアプリのもの（読み取り専用、上書きしない） */
+  foreign: boolean;
 }
 
 export const UNREADABLE_NOTICE = 'サイドカーを読み込めないため、編集内容は保存されません';
+export const FOREIGN_NOTICE = '同じ名前の JSON（他のアプリのもの）があるため、この写真の編集内容は保存されません';
 
 type TimerHandle = ReturnType<typeof setTimeout>;
 
@@ -174,7 +177,7 @@ class EditorImpl implements Editor {
     this.status.corrupted = st.corrupted;
     this.status.sourceChanged = st.sourceChanged;
     this.status.decodeError = null;
-    this.status.notice = st.unreadable ? UNREADABLE_NOTICE : null;
+    this.status.notice = st.unreadable ? UNREADABLE_NOTICE : st.foreign ? FOREIGN_NOTICE : null;
     this.syncFromState(st);
 
     await this.decode(ref, token);
@@ -219,7 +222,7 @@ class EditorImpl implements Editor {
     const actual: SourceInfo = { name: ref.name, size: ref.size, mtime: ref.mtime };
     const st: ImageState = {
       history: new History(defaultParams()), rating: 0, source: actual,
-      readOnly: false, corrupted: false, sourceChanged: false, unreadable: false,
+      readOnly: false, corrupted: false, sourceChanged: false, unreadable: false, foreign: false,
     };
     const { backend } = this.deps;
     let raw: unknown = null;
@@ -244,8 +247,12 @@ class EditorImpl implements Editor {
         st.readOnly = loaded.readOnly;
         st.sourceChanged = sourceChanged(loaded.source, actual);
       } catch (e) {
-        if (!(e instanceof SidecarError)) throw e;
-        bad = true;
+        if (e instanceof ForeignSidecarError) {
+          // 他のアプリのファイルは退避も上書きもしない（最終レビュー I2）
+          st.readOnly = true;
+          st.foreign = true;
+        } else if (!(e instanceof SidecarError)) throw e;
+        else bad = true;
       }
     }
     if (bad) {

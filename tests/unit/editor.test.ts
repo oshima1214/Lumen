@@ -288,9 +288,9 @@ describe('読み込み', () => {
     expect(editor.readOnly).toBe(false);
   });
 
-  it('破損サイドカー（SidecarError: app が違う）→ quarantine して既定値、corrupted', async () => {
+  it('破損サイドカー（SidecarError: Lumen のファイルだが schema が不正）→ quarantine して既定値、corrupted', async () => {
     const { editor, backend } = setup();
-    backend.sidecars.set('A', { app: 'other', schema: 1 });
+    backend.sidecars.set('A', { app: 'lumen', schema: 0 });
     await editor.refresh();
     await editor.open('A');
     expect(backend.quarantined).toEqual(['A']);
@@ -531,5 +531,33 @@ describe('setPreviewCrop', () => {
     editor.setPreviewCrop({ x: 0, y: 0, w: 1, h: 1, angle: 5, aspect: 'free' });
     await editor.open('B');
     expect(editor.previewCrop).toBeNull();
+  });
+});
+
+// ---- 最終レビュー I2: 他のアプリの同名 JSON（例: Google Takeout の IMG_1234.JPG.json）を壊れたサイドカーとして退避しない ----
+describe('他のアプリの JSON', () => {
+  it('退避せず、読み取り専用で開いて案内を出し、上書きしない', async () => {
+    const { editor, backend } = setup();
+    const takeout = { title: 'A.jpg', photoTakenTime: { timestamp: '1700000000' }, geoData: { latitude: 35 } };
+    backend.sidecars.set('A', takeout);
+    await editor.refresh(); await editor.open('A');
+    expect(backend.quarantined).toEqual([]);
+    expect(editor.status.corrupted).toBe(false);
+    expect(editor.readOnly).toBe(true);
+    expect(editor.status.notice).toMatch(/他のアプリ/);
+    editor.update((p) => { p.basic.exposure = 1; });
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(backend.sidecars.get('A')).toEqual(takeout);
+  });
+
+  it('JSON の配列なども他のアプリのものとして扱う。Lumen の app で中身が不正なら従来どおり退避', async () => {
+    const { editor, backend } = setup();
+    backend.sidecars.set('A', [1, 2, 3]);
+    backend.sidecars.set('B', { app: 'lumen', schema: 'x' });
+    await editor.refresh(); await editor.open('A');
+    expect(backend.quarantined).toEqual([]);
+    await editor.open('B');
+    expect(backend.quarantined).toEqual(['B']);
+    expect(editor.status.corrupted).toBe(true);
   });
 });

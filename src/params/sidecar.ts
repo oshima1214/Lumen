@@ -21,6 +21,9 @@ export class SidecarError extends Error {
   }
 }
 
+/** JSON としては読めるが Lumen のサイドカーではない（例: Google Takeout の <名前>.json）。退避も上書きもしない */
+export class ForeignSidecarError extends SidecarError {}
+
 type Json = Record<string, unknown>;
 
 /** migrations[n] は schema n の JSON を schema n+1 に変換する。現在は空 */
@@ -53,8 +56,8 @@ function readRating(v: unknown): number {
 }
 
 export function fromSidecar(json: unknown): LoadedSidecar {
-  if (!isObj(json)) throw new SidecarError('サイドカーが JSON オブジェクトではありません');
-  if (json.app !== 'lumen') throw new SidecarError('サイドカーの app が lumen ではありません');
+  if (!isObj(json)) throw new ForeignSidecarError('同じ名前の JSON は Lumen のサイドカーではありません');
+  if (json.app !== 'lumen') throw new ForeignSidecarError('同じ名前の JSON は他のアプリのものです');
   let schema = json.schema;
   if (typeof schema !== 'number' || !Number.isInteger(schema) || schema < 1) {
     throw new SidecarError('サイドカーの schema が不正です');
