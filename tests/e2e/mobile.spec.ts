@@ -111,3 +111,24 @@ test('編集画面を開いても、操作してもコンソールにエラー�
   await page.waitForTimeout(500);
   expect(errors).toEqual([]);
 });
+
+// 実機で報告: 写真アプリ／ファイルから選んでも一覧に出ない（メッセージも出ない）。
+// iOS Safari では画面に置いていない <input type=file> の change が届かないことがあるため、選択中は画面内に置く。
+// あわせて取り込みの各段階を診断ログ（設定メニュー）に残す。
+test('写真の選択中は input が画面内にあり、取り込みの経過が診断ログに残る', async ({ page }) => {
+  await app.open(page, { backend: 'library' });
+  await expect(page.getByTestId('grid-item')).toHaveCount(3);
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: '写真を取り込む' }).click();
+  const fc = await chooser;
+  expect(await page.evaluate(() => document.body.querySelectorAll('input[type=file]').length)).toBe(1);
+  const jpeg = await page.evaluate(async () => Array.from(new Uint8Array(await (await fetch('/__e2e/files/fixtures/gray128.jpg')).arrayBuffer())));
+  await fc.setFiles({ name: 'IMG_0100.JPG', mimeType: 'image/jpeg', buffer: Buffer.from(jpeg) });
+  await expect(page.getByTestId('grid-item')).toHaveCount(4);
+  expect(await page.evaluate(() => document.body.querySelectorAll('input[type=file]').length)).toBe(0);   // 終わったら外す
+  await page.getByRole('button', { name: '設定' }).click();
+  const log = page.getByTestId('diag-log');
+  await expect(log).toContainText('受け取ったファイル: 1 枚');
+  await expect(log).toContainText('IMG_0100.JPG');
+  await expect(log).toContainText('一覧: 4 件');
+});
