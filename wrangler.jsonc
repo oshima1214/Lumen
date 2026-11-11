@@ -1,0 +1,10 @@
+// Cloudflare Workers（静的アセット）で公開するための設定。ビルド出力 dist/ をそのまま配信する。
+// public/_headers（COOP/COEP）も dist/ に入り、Workers の静的アセットでも適用される。
+{
+  "name": "lumen",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}

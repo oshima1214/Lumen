@@ -1,0 +1,27 @@
+{
+  "_note": "raw.pixls.us の公開サンプル（CC0）。sha256 は取得時に記録。D5300 は未収録のため同世代の D5200 を使う。iPhone HEIC は再配布可能な公開サンプルが見つからないため未登録（test-assets/ に実機ファイルを置くと有効になる）。",
+  "canon-20d-cr2": {
+    "url": "https://raw.pixls.us/data/Canon/EOS%2020D/IMG_3893.CR2",
+    "ext": "cr2",
+    "license": "CC0",
+    "sha256": "db78660d48589130d99e0bc621424851eb0f84df052634fb5bc89c7a02fe7033"
+  },
+  "nikon-d5200-nef": {
+    "url": "https://raw.pixls.us/data/Nikon/D5200/NIKON_D5200_14_bit_compressed.NEF",
+    "ext": "nef",
+    "license": "CC0",
+    "sha256": "6c49ca47d189f9d6766f94be7c9d7d779ce45c79c0c6e48a0eba7d92f320fe0e"
+  },
+  "iphone-proraw-dng": {
+    "url": "https://raw.pixls.us/data/Apple/iPhone%2012%20Pro/IMG_1361.DNG",
+    "ext": "dng",
+    "license": "CC0",
+    "sha256": "e91e77a4533ed7cce551d83330676ea5c47dd5e55fb38adda7819366afdbdfc2"
+  },
+  "bayer-dng": {
+    "url": "https://raw.pixls.us/data/Apple/iPhone%208/RAW_2018_11_07_14_43_14_820_noflash.dng",
+    "ext": "dng",
+    "license": "CC0",
+    "sha256": "75cc053e427c3ca2dfa8526dc6c9c77fdb265bc5d005af1fd408b5084250a9fc"
+  }
+}
