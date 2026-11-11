@@ -4,6 +4,7 @@
   import Settings from 'lucide-svelte/icons/settings';
   import TriangleAlert from 'lucide-svelte/icons/triangle-alert';
   import { useApp } from './context';
+  import { diagLog } from './diag.svelte';
 
   const app = useApp();
   let open = $state(false);
@@ -35,11 +36,17 @@
           </div>
         {/if}
       {/if}
+      <details class="diag" open={diagLog.length > 0}>
+        <summary>診断ログ（不具合の報告用）</summary>
+        <pre data-testid="diag-log">{diagLog.length ? diagLog.join('\n') : 'まだ記録はありません'}</pre>
+        <button onclick={() => navigator.clipboard?.writeText(diagLog.join('\n'))}>コピー</button>
+      </details>
     </div>
   {/if}
 </div>
 
 <style>
+  .diag pre { white-space: pre-wrap; font-size: 11px; max-height: 40vh; overflow: auto; background: var(--bg); padding: 6px; border-radius: 4px; }
   .settings { position: relative; }
   .dot { position: absolute; top: 10px; right: 10px; width: 6px; height: 6px; border-radius: 50%; background: var(--danger); }
   .menu {

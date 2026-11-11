@@ -13,6 +13,7 @@ import { exportImages, type ExportResult, type ExportSettings } from '../export/
 import type { Aspect, DevelopParams, ParamGroup } from '../params/types';
 import { FolderBackend } from '../storage/folder';
 import { createBackend, pickDirectory, testBackend } from './backend';
+import { logDiag } from './diag.svelte';
 import { aspectValue, constrainCrop, maxInscribedCrop, orientedSize } from '../engine/geometry';
 
 type Crop = DevelopParams['crop'];
@@ -171,6 +172,7 @@ export class App {
       this.group = null;
       if (this.backend instanceof LibraryBackend) {
         const r = this.backend.lastImport;
+        if (r) logDiag(`取り込み: 追加 ${r.added.length} 枚 / JPEG に変換されていた ${r.transcoded.length} 枚 / 取り込めなかった ${r.rejected.length} 枚${r.rejected.length ? `（${r.rejected.map((x) => `${x.name}: ${x.reason}`).join('、')}）` : ''}`);
         if (r && r.transcoded.length > 0) {
           this.info = `${r.transcoded.length} 枚は JPEG に変換されて渡されました。「ファイル」から選ぶとオリジナルのまま取り込めます。`;
         }
@@ -179,7 +181,9 @@ export class App {
         }
       }
       await this.reload();
+      logDiag(`一覧: ${this.editor.images.length} 件`);
     } catch (e) {
+      logDiag(`エラー: ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`);
       if (!isAbort(e)) this.error = message(e);
     }
   }
