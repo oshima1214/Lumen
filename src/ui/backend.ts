@@ -3,6 +3,7 @@ import { FolderBackend } from '../storage/folder';
 import { idbHandleStore } from '../storage/handles';
 import { LibraryBackend } from '../storage/library';
 import type { StorageBackend } from '../storage/types';
+import { logDiag } from './diag.svelte';
 
 /** 計画 Task 22: `import.meta.env.MODE === 'test'` のビルドでだけ有効（本番ビルドでは静的に null） */
 export function testBackend(): StorageBackend | null {
@@ -10,15 +11,26 @@ export function testBackend(): StorageBackend | null {
   return (window as unknown as { __lumenTestBackend?: StorageBackend }).__lumenTestBackend ?? null;
 }
 
-/** 写真・RAW を選ぶ <input type="file" multiple>。キャンセルされたら空配列 */
-function pickFiles(): Promise<File[]> {
+/** 写真・RAW を選ぶ <input type="file" multiple>。キャンセルされたら空配列。
+ *  iOS Safari では画面に置いていない input の change が届かないことがあるため、選択中は body に（見えない状態で）置き、
+ *  終わったら外す。届いたファイルは診断ログに残す。 */
+export function pickFiles(): Promise<File[]> {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.multiple = true;
     input.accept = 'image/*,.heic,.heif,.dng,.cr2,.nef';
-    input.addEventListener('change', () => resolve([...(input.files ?? [])]), { once: true });
-    input.addEventListener('cancel', () => resolve([]), { once: true });
+    input.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0';
+    document.body.append(input);
+    const done = (files: File[]) => {
+      input.remove();
+      logDiag(files.length === 0 ? '写真の選択: キャンセル' :
+        `受け取ったファイル: ${files.length} 枚（${files.slice(0, 5).map((f) => `${f.name} ${f.type || '形式不明'} ${Math.round(f.size / 1024)}KB`).join('、')}${files.length > 5 ? ' ほか' : ''}）`);
+      resolve(files);
+    };
+    input.addEventListener('change', () => done([...(input.files ?? [])]), { once: true });
+    input.addEventListener('cancel', () => done([]), { once: true });
+    logDiag('写真の選択画面を開きます');
     input.click();
   });
 }

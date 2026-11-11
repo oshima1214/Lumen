@@ -5,20 +5,12 @@
 import { FakeDir } from '../../helpers/fake-fs';
 import { FolderBackend } from '../../../src/storage/folder';
 import { LibraryBackend } from '../../../src/storage/library';
+import { pickFiles } from '../../../src/ui/backend';   // 本番と同じ写真選択の処理を使う
 
 const SETS: Record<string, [name: string, fixture: string | null][]> = {
   basic: [['01 グレー.jpg', 'gray128.jpg'], ['02 グラデーション.png', 'gradient.png'], ['03 カラーチャート.png', 'colorchart.png']],
   broken: [['01 グレー.jpg', 'gray128.jpg'], ['02 壊れた.jpg', null], ['03 カラーチャート.png', 'colorchart.png']],
 };
-
-function pickFiles(): Promise<File[]> {
-  return new Promise((resolve) => {
-    const input = document.createElement('input');
-    input.type = 'file'; input.multiple = true;
-    input.addEventListener('change', () => resolve([...(input.files ?? [])]), { once: true });
-    input.click();
-  });
-}
 
 async function startLibrary(q: URLSearchParams): Promise<void> {
   const opfs = await navigator.storage.getDirectory();
